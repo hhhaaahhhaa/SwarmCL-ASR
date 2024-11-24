@@ -47,7 +47,7 @@ def create_config(args):
 
 def train_one_task(config: dict, debug: bool=False):
     # Init system
-    system_cls = get_task(config["system_name"])(config)
+    system_cls = get_system_cls(config["system_name"])(config)
 
     if config.get("checkpoint", None) is not None:
         try:
@@ -120,10 +120,10 @@ if __name__ == "__main__":
     parser.add_argument('-t', '--task_name', type=str, help="task identifier")
     parser.add_argument('-n', '--exp_name', type=str, default="unnamed")
     parser.add_argument('-c', '--checkpoint', type=str, default=None)
-    parser.add_argument('--config', nargs='+', default=["config/system/suta.yaml"])
+    parser.add_argument('--config', nargs='+', default=["config/system/base.yaml"])
     parser.add_argument(
         "--logger", type=str, help="output result path",
-        default="tb",
+        default="none",
     )
     parser.add_argument("--debug", action="store_true", default=False)
 

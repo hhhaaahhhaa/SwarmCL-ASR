@@ -9,7 +9,7 @@ class Task(object):
     def train_dataset(self) -> Optional[Dataset]:
         return None
 
-    def eval_dataset(self) -> Optional[Dataset]:
+    def val_dataset(self) -> Optional[Dataset]:
         return None
     
     def test_dataset(self) -> Optional[Dataset]:
