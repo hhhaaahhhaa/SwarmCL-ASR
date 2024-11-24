@@ -1,0 +1,6 @@
+SYNTH="/mnt/d/Projects/tts_api/suta"
+MUSAN="/mnt/d/Data/musan"
+ESD="/mnt/d/Data/ESD_suta"
+L2ARCTIC="/mnt/d/Data/l2arctic"
+CHIME="/mnt/d/Data/ChiME3"
+SWBD="/mnt/d/Data/suta_switchboard"
