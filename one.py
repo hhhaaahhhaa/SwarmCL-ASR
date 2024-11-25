@@ -34,7 +34,7 @@ def create_config(args):
     exp_name = args.exp_name
     exp_root = f"results/{exp_name}"  # maximum flexibility
     os.makedirs(exp_root, exist_ok=True)
-    res["output_dir"] = {
+    res["config"]["output_dir"] = {
         "log_dir": f"{exp_root}/log",
         "result_dir": f"{exp_root}/result",
         "ckpt_dir": f"{exp_root}/ckpt"
@@ -47,16 +47,17 @@ def create_config(args):
 
 def train_one_task(config: dict, debug: bool=False):
     # Init system
-    system_cls = get_system_cls(config["system_name"])(config)
-
+    system_config = config["config"]
+    system_cls = get_system_cls(config["system_name"])
     if config.get("checkpoint", None) is not None:
         try:
             print(f'Load from {config["checkpoint"]}...')
-            system = system_cls.load_from_checkpoint(config["checkpoint"], config=config)  # ONLY load weights
+            system = system_cls.load_from_checkpoint(config["checkpoint"], config=config)  # ONLY load weights and overwrite config
         except:
             print(f'System {config["system_name"]} fails/unsupports checkpoint loading.')
             exit()
-
+    else:
+        system = system_cls(system_config)
     if debug:
         print("System module prepared.")
         input()
@@ -67,7 +68,7 @@ def train_one_task(config: dict, debug: bool=False):
         train_dataset=task.train_dataset(),
         val_dataset=task.val_dataset(),
         test_dataset=task.test_dataset(),
-        batch_size=config["train_config"]["batch_size"]
+        batch_size=system_config["train_config"]["per_device_train_batch_size"]
     )
     if debug:
         print("Data module prepared.")
@@ -77,30 +78,29 @@ def train_one_task(config: dict, debug: bool=False):
     loggers = None
     
     # Training
-    train_config = config["train_config"]
+    train_config = system_config["train_config"]
     trainer_training_config = {
-        'max_steps': train_config["step"]["total_step"],
-        'log_every_n_steps': train_config["step"]["log_step"],
-        'val_check_interval': train_config["step"]["val_step"],
-        'check_val_every_n_epoch': None,
+        'default_root_dir': system_config["output_dir"],
+        'max_epochs': train_config["num_train_epochs"],
+        'log_every_n_steps': train_config["logging_steps"],
     }
     if system.automatic_optimization:
         trainer_training_config.update({
-            'gradient_clip_val': train_config["optimizer"]["grad_clip_thresh"],
-            'accumulate_grad_batches': train_config["optimizer"]["grad_acc_step"],
+            'gradient_clip_val': train_config.get("grad_clip_thresh", 1.0),
+            'accumulate_grad_batches': train_config.get("gradient_accumulation_steps", 1),
         })
 
     print("========================== Start Training! ==========================")
-    pl.seed_everything(43, True)
+    pl.seed_everything(42, True)
     TRAINER_CONFIG = {
         "accelerator": "gpu" if torch.cuda.is_available() else None,
         "strategy": "ddp_find_unused_parameters_true",  # multigpu should use ddp
         "profiler": 'simple',
     }
     if debug:  # Useful for debugging
-        TRAINER_CONFIG.update({
-            "limit_train_batches": 300,
-            "limit_val_batches": 50,
+        trainer_training_config.update({
+            "limit_train_batches": 5,
+            "limit_val_batches": 5,
             "max_epochs": 3
         })
     trainer = pl.Trainer(logger=loggers, **TRAINER_CONFIG, **trainer_training_config)

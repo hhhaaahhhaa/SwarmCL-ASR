@@ -3,35 +3,27 @@ import lightning as pl
 
 class System(pl.LightningModule):
     """ Abstract base class for all systems. """
-    def __init__(self, config, *args, **kwargs) -> None:
+    def __init__(self, config: dict) -> None:
         super().__init__()
+        self.save_hyperparameters()
         self.config = config
-        self.build_configs(*args, **kwargs)
-
         self.log_dir = config["output_dir"]["log_dir"]
         self.result_dir = config["output_dir"]["result_dir"]
         self.ckpt_dir = config["output_dir"]["ckpt_dir"]
-        self.save_hyperparameters()
 
-        self.build_model(*args, **kwargs)
+        self.build_configs()
+        self.build_model()
 
-    def build_configs(self, *args, **kwargs):
+    def build_configs(self):
         """ Parse additional information """
         pass
 
-    def build_model(self, *args, **kwargs):
+    def build_model(self):
         """ Build all components here. """
         pass
 
-    def build_saver(self):
-        """ Return a list of savers(callbacks). """
-        return []
-
-    def on_save_checkpoint(self, checkpoint):
-        """Overwrite if you want to save more things in the checkpoint."""
-        return checkpoint
-
     def on_load_checkpoint(self, checkpoint: dict) -> None:
+        # support loading to a different structure by matching names
         self.test_global_step = checkpoint["global_step"]
         state_dict = checkpoint["state_dict"]
         model_state_dict = self.state_dict()
@@ -51,6 +43,9 @@ class System(pl.LightningModule):
                 #     print(f"Dropping parameter {k}")
                 state_dict_pop_keys.append(k)
                 is_changed = True
+        
+        if is_changed:
+            print("You try to load the checkpoint to a different architecture, make sure you know what you are doing.")
 
         # modify state_dict format to model_state_dict format
         for k in state_dict_pop_keys:

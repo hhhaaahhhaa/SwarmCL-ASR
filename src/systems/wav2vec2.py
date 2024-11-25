@@ -19,7 +19,7 @@ class Wav2vec2System(System):
         self.vocab = json.load(f)
 
     def build_configs(self):
-        self.bs = self.config["train_config"]["batch_size"]
+        self.bs = self.config["train_config"]["per_device_train_batch_size"]
 
     def _load_model_and_tokenizer(self):
         # load from huggingface
@@ -167,7 +167,8 @@ class Wav2vec2System(System):
             self._build_optimized_model(),
             self.config["opt"], self.config["lr"], scheduler=self.config["scheduler"]
         )
-
+        if self.scheduler is None:
+            return {"optimizer": self.optimizer}
         return {
             "optimizer": self.optimizer,
             "lr_scheduler": self.scheduler
@@ -175,11 +176,10 @@ class Wav2vec2System(System):
     
     # configure callback
     def configure_callbacks(self) -> list[Callback]:
-        save_step = self.config["step"]["save_step"]
         checkpoint = ModelCheckpoint(
             dirpath=self.ckpt_dir,
             monitor="Val/Total Loss", mode="min",
-            every_n_train_steps=save_step, save_top_k=-1
+            save_top_k=-1
         )
         outer_bar = GlobalProgressBar(process_position=1)
         lr_monitor = LearningRateMonitor()
