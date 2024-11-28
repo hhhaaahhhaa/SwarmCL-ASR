@@ -134,23 +134,23 @@ class StandardCorpus(object):
     def __init__(self, root: str) -> None:
         assert os.path.exists(root), f"Can't find {root}, please run preprocess first!"
         with open(f"{root}/data_info.json", "r", encoding="utf-8") as f:
-            data_info = json.load(f)
+            self.data_info = json.load(f)
         self.wav_paths = []
         self.texts = []
+        self.text_paths = []
         
-        for instance in data_info:
+        for instance in self.data_info:
             basename = instance["basename"]
-            with open(f"{root}/text/{basename}.txt", "r", encoding="utf-8") as f:
-                text = f.read()
-                self.texts.append(text.strip())
             self.wav_paths.append(f"{root}/wav/{basename}.wav")
+            self.texts.append(instance["text"])
+            self.text_paths.append(f"{root}/text/{basename}.txt")
 
     def __len__(self):
         return len(self.wav_paths)
     
     def get(self, idx) -> dict:
         wav, _ = librosa.load(self.wav_paths[idx], sr=16000)
-        text = preprocess_text(self.texts[idx])
+        text = preprocess_text(self.texts[idx].strip())
 
         return {
             "id": self.wav_paths[idx],

@@ -162,5 +162,5 @@ cython_debug/
 #.idea/
 
 
-*_/
+_*/
 results/

@@ -3,19 +3,15 @@ import torch
 import argparse
 import yaml
 import lightning as pl
+from lightning.pytorch.profilers import SimpleProfiler
 
 from src.systems.load import get_system_cls
 from src.tasks.load import get_task
 from src.datamodule import DataModule
 
 
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "max_split_size_mb:256"  # https://stackoverflow.com/questions/73747731/runtimeerror-cuda-out-of-memory-how-can-i-set-max-split-size-mb
-
-TRAINER_CONFIG = {
-    "accelerator": "gpu" if torch.cuda.is_available() else None,
-    "strategy": "ddp_find_unused_parameters_true",  # multigpu should use ddp
-    "profiler": 'simple',
-}
 
 
 def create_config(args):
@@ -35,6 +31,7 @@ def create_config(args):
     exp_root = f"results/{exp_name}"  # maximum flexibility
     os.makedirs(exp_root, exist_ok=True)
     res["config"]["output_dir"] = {
+        "exp_root": exp_root,
         "log_dir": f"{exp_root}/log",
         "result_dir": f"{exp_root}/result",
         "ckpt_dir": f"{exp_root}/ckpt"
@@ -52,7 +49,7 @@ def train_one_task(config: dict, debug: bool=False):
     if config.get("checkpoint", None) is not None:
         try:
             print(f'Load from {config["checkpoint"]}...')
-            system = system_cls.load_from_checkpoint(config["checkpoint"], config=config)  # ONLY load weights and overwrite config
+            system = system_cls.load_from_checkpoint(config["checkpoint"], config=system_config)  # ONLY load weights and overwrite config
         except:
             print(f'System {config["system_name"]} fails/unsupports checkpoint loading.')
             exit()
@@ -80,7 +77,7 @@ def train_one_task(config: dict, debug: bool=False):
     # Training
     train_config = system_config["train_config"]
     trainer_training_config = {
-        'default_root_dir': system_config["output_dir"],
+        'default_root_dir': system_config["output_dir"]["exp_root"],
         'max_epochs': train_config["num_train_epochs"],
         'log_every_n_steps': train_config["logging_steps"],
     }
@@ -92,18 +89,19 @@ def train_one_task(config: dict, debug: bool=False):
 
     print("========================== Start Training! ==========================")
     pl.seed_everything(42, True)
-    TRAINER_CONFIG = {
-        "accelerator": "gpu" if torch.cuda.is_available() else None,
-        "strategy": "ddp_find_unused_parameters_true",  # multigpu should use ddp
-        "profiler": 'simple',
-    }
     if debug:  # Useful for debugging
         trainer_training_config.update({
             "limit_train_batches": 5,
             "limit_val_batches": 5,
             "max_epochs": 3
         })
-    trainer = pl.Trainer(logger=loggers, **TRAINER_CONFIG, **trainer_training_config)
+    trainer = pl.Trainer(
+        **trainer_training_config,
+        accelerator="gpu" if torch.cuda.is_available() else None,
+        strategy="ddp_find_unused_parameters_true",  # multigpu should use ddp
+        logger=loggers,
+        profiler=SimpleProfiler(system_config["output_dir"]["exp_root"], filename="profile"),
+    )
     trainer.fit(system, datamodule=datamodule)
 
 
@@ -122,7 +120,7 @@ if __name__ == "__main__":
     parser.add_argument('-c', '--checkpoint', type=str, default=None)
     parser.add_argument('--config', nargs='+', default=["config/system/base.yaml"])
     parser.add_argument(
-        "--logger", type=str, help="output result path",
+        "--logger", type=str,
         default="none",
     )
     parser.add_argument("--debug", action="store_true", default=False)

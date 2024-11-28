@@ -23,6 +23,7 @@ class DataModule(pl.LightningDataModule):
             self.train_dataset,
             batch_size=self.batch_size,
             shuffle=True,
+            collate_fn=default_collate,
             num_workers=4,
         )
         return self.train_loader
@@ -32,6 +33,15 @@ class DataModule(pl.LightningDataModule):
             self.val_dataset,
             batch_size=self.batch_size,
             shuffle=False,
+            collate_fn=default_collate,
             num_workers=0,
         )
         return self.val_loader
+
+
+def default_collate(batch: list[dict]) -> dict[str, list]:
+    res = {k: [] for k in batch[0]}
+    for x in batch:
+        for k, v in x.items():
+            res[k].append(v)
+    return res

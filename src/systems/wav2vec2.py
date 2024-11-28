@@ -73,7 +73,7 @@ class Wav2vec2System(System):
         return labels.to(device=self.model.device)
 
     def _common_step(self, batch, batch_idx, train=True) -> tuple[dict, dict]:
-        wavs, texts = batch["wavs"], batch["texts"]
+        wavs, texts = batch["wav"], batch["text"]
         inputs = self._wav_to_model_input(wavs)
         labels = self._text_to_model_input(texts)
         inputs["labels"] = labels
@@ -179,7 +179,8 @@ class Wav2vec2System(System):
         checkpoint = ModelCheckpoint(
             dirpath=self.ckpt_dir,
             monitor="Val/Total Loss", mode="min",
-            save_top_k=-1
+            save_top_k=-1,
+            filename='{epoch}'
         )
         outer_bar = GlobalProgressBar(process_position=1)
         lr_monitor = LearningRateMonitor()

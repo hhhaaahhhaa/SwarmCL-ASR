@@ -1,19 +1,13 @@
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, ConcatDataset
 
 from .base import Task, StandardDataset
 
 
 class CVAccentTask(Task):
     def __init__(self, accent: str="aus") -> None:
-        # temporary for debugging
-        tmp_root = f"/mnt/d/Projects/Test-time-adaptation-ASR-SUTA/_cache/CommonVoice-accent/{accent}"
-        self._train_dataset = StandardDataset(root=tmp_root)
-        self._val_dataset = StandardDataset(root=tmp_root)
-        self._test_dataset = StandardDataset(root=tmp_root)
-
-        # self._train_dataset = StandardDataset(root=f"_cache/CommonVoice-accent/{accent}/train")
-        # self._val_dataset = StandardDataset(root=f"_cache/CommonVoice-accent/{accent}/val")
-        # self._test_dataset = StandardDataset(root=f"_cache/CommonVoice-accent/{accent}/test")
+        self._train_dataset = StandardDataset(root=f"_cache/CommonVoice-accent-full/{accent}/train")
+        self._val_dataset = StandardDataset(root=f"_cache/CommonVoice-accent-full/{accent}/dev")
+        self._test_dataset = StandardDataset(root=f"_cache/CommonVoice-accent-full/{accent}/test")
 
     def train_dataset(self) -> Dataset:
         return self._train_dataset
@@ -53,3 +47,26 @@ class SCOTask(Dataset):
 class USTask(Dataset):
     def __new__(cls):
         return CVAccentTask(accent="us")
+
+
+class AllTask(Task):
+    def __init__(self) -> None:
+        accents = ["aus", "eng", "ind", "ire", "sco"]
+        self._train_dataset = ConcatDataset([
+            StandardDataset(root=f"_cache/CommonVoice-accent-full/{accent}/train")
+        for accent in accents])
+        self._val_dataset = ConcatDataset([
+            StandardDataset(root=f"_cache/CommonVoice-accent-full/{accent}/dev")
+        for accent in accents])
+        self._test_dataset = ConcatDataset([
+            StandardDataset(root=f"_cache/CommonVoice-accent-full/{accent}/test")
+        for accent in accents])
+
+    def train_dataset(self) -> Dataset:
+        return self._train_dataset
+
+    def val_dataset(self) -> Dataset:
+        return self._val_dataset
+    
+    def test_dataset(self) -> Dataset:
+        return self._test_dataset
