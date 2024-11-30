@@ -88,12 +88,18 @@ def train_one_task(config: dict, debug: bool=False):
         })
 
     print("========================== Start Training! ==========================")
+    print("Output Dir: ", system_config["output_dir"]["exp_root"])
+    print("System name: ", config["system_name"])
+    print("Task name: ", config["task_name"])
+    print("Checkpoint Path: ", config.get("checkpoint", "none"))
+    
     pl.seed_everything(42, True)
     if debug:  # Useful for debugging
         trainer_training_config.update({
-            "limit_train_batches": 5,
+            "limit_train_batches": 10,
             "limit_val_batches": 5,
-            "max_epochs": 3
+            "max_epochs": 3,
+            'log_every_n_steps': 1,
         })
     trainer = pl.Trainer(
         **trainer_training_config,

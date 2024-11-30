@@ -1,11 +1,10 @@
 import torch
 import torch.nn as nn
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor, Wav2Vec2ProcessorWithLM
-from transformers import HubertForCTC, Data2VecAudioForCTC
 import json
-from lightning.pytorch.callbacks import LearningRateMonitor, ModelCheckpoint, Callback
+from lightning.pytorch.callbacks import ModelCheckpoint, Callback
+from lightning.pytorch.loggers.logger import merge_dicts
 
-from .common.progressbar import GlobalProgressBar
 from .base import System
 
 
@@ -30,12 +29,7 @@ class Wav2vec2System(System):
             self.processor = Wav2Vec2Processor.from_pretrained(model_name, sampling_rate=Wav2vec2System.SAMPLE_RATE)
         
         # Model ablation
-        if model_name == "facebook/data2vec-audio-base-960h":
-            self.model = Data2VecAudioForCTC.from_pretrained(model_name)
-        elif model_name == "facebook/hubert-large-ls960-ft":
-            self.model = HubertForCTC.from_pretrained(model_name)
-        else:
-            self.model = Wav2Vec2ForCTC.from_pretrained(model_name)
+        self.model = Wav2Vec2ForCTC.from_pretrained(model_name, ctc_loss_reduction="mean")  # be careful that we need to use mean
         self.model.train()  # huggingface default loads with eval mode
 
     def build_model(self):
@@ -91,16 +85,13 @@ class Wav2vec2System(System):
 
     def training_step(self, batch, batch_idx):
         train_loss_dict, info = self._common_step(batch, batch_idx, train=True)
-
-        loss_dict = {f"Train/{k}": v.item() for k, v in train_loss_dict.items()}
-        self.log_dict(loss_dict, sync_dist=True, batch_size=self.bs)
         return {'loss': train_loss_dict["Total Loss"], 'losses': train_loss_dict, 'info': info}
     
     def validation_step(self, batch, batch_idx):
         val_loss_dict, info = self._common_step(batch, batch_idx, train=False)
 
         loss_dict = {f"Val/{k}": v.item() for k, v in val_loss_dict.items()}
-        self.log_dict(loss_dict, sync_dist=True, batch_size=self.bs)
+        self.log_dict(loss_dict, sync_dist=True, batch_size=self.bs, prog_bar=True)
         return {'loss': val_loss_dict["Total Loss"], 'losses': val_loss_dict, 'info': info}
     
     # configure optimizer
@@ -179,13 +170,13 @@ class Wav2vec2System(System):
         checkpoint = ModelCheckpoint(
             dirpath=self.ckpt_dir,
             monitor="Val/Total Loss", mode="min",
-            save_top_k=-1,
+            save_top_k=1,
+            save_last=True,
             filename='{epoch}'
         )
-        outer_bar = GlobalProgressBar(process_position=1)
-        lr_monitor = LearningRateMonitor()
+        saver = Saver(self.config["output_dir"])
         
-        return [checkpoint, outer_bar, lr_monitor]
+        return [checkpoint, saver]
 
     # inference
     @torch.no_grad()
@@ -235,3 +226,25 @@ def setup_optimizer(params, opt_name='AdamW', lr=1e-4, beta=0.9, weight_decay=0.
         return optimizer, eval(scheduler)(optimizer, step_size=step_size, gamma=gamma)
     else: 
         return optimizer, None
+
+
+class Saver(Callback):
+
+    def __init__(self, config):
+        super().__init__()
+        self.log_dir = config["log_dir"]
+        self.result_dir = config["result_dir"]
+
+        self.train_loss_dicts = []
+        self.val_loss_dicts = []
+
+    def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
+        losses = outputs['losses']
+        loss_dict = {f"Train/{k}": v.item() for k, v in losses.items()}
+        self.train_loss_dicts.append(loss_dict)
+
+        # handle gradient accumulation logging
+        if (batch_idx + 1) % trainer.accumulate_grad_batches == 0:
+            avg_loss_dict = merge_dicts(self.train_loss_dicts)
+            pl_module.log_dict(avg_loss_dict, sync_dist=True, batch_size=pl_module.bs, prog_bar=True)
+            self.train_loss_dicts = []
