@@ -94,16 +94,7 @@ class Wav2vec2System(System):
         self.log_dict(loss_dict, sync_dist=True, batch_size=self.bs, prog_bar=True)
         return {'loss': val_loss_dict["Total Loss"], 'losses': val_loss_dict, 'info': info}
     
-    # configure optimizer
-    def _build_optimized_model(self):
-        self.model.requires_grad_(False)
-        params, self.opt_param_names = self._collect_params()
-        # print(param_names[:10])
-        for p in params:
-            p.requires_grad = True
-        print("Optimizable: ", sum(p.numel() for p in self.model.parameters() if p.requires_grad))
-        return params
-    
+    # configure optimizer    
     def _collect_params(self):
         """Collect the affine scale + shift parameters from batch norms.
 
@@ -154,8 +145,15 @@ class Wav2vec2System(System):
         return params, names
 
     def configure_optimizers(self):
+        self.model.requires_grad_(False)
+        params, self.opt_param_names = self._collect_params()
+        # print(param_names[:10])
+        for p in params:
+            p.requires_grad = True
+        print("Optimizable: ", sum(p.numel() for p in self.model.parameters() if p.requires_grad))
+
         self.optimizer, self.scheduler = setup_optimizer(
-            self._build_optimized_model(),
+            params,
             self.config["opt"], self.config["lr"], scheduler=self.config["scheduler"]
         )
         if self.scheduler is None:
@@ -168,7 +166,7 @@ class Wav2vec2System(System):
     # configure callback
     def configure_callbacks(self) -> list[Callback]:
         checkpoint = ModelCheckpoint(
-            dirpath=self.ckpt_dir,
+            dirpath=self.config["output_dir"]["ckpt_dir"],
             monitor="Val/Total Loss", mode="min",
             save_top_k=1,
             save_last=True,
@@ -203,11 +201,8 @@ class Wav2vec2System(System):
         
     #     return list(transcription)
     
-    # def save(self, path: str) -> None:
-    #     torch.save(self.model.state_dict(), path)
-
-    # def load(self, path: str) -> None:
-    #     self.model.load_state_dict(torch.load(path))
+    def get_main_module(self):
+        return self.model
 
 
 def setup_optimizer(params, opt_name='AdamW', lr=1e-4, beta=0.9, weight_decay=0., scheduler=None, step_size=1, gamma=0.7):

@@ -1,0 +1,13 @@
+swarm:
+  iterations: 50
+  N: 20
+  patience: 10
+
+  inertia: 0.1
+  cognitive_coeff: 0.1
+  social_coeff: 0.1
+  repel_coeff: 0.1
+  step_length: 0.5
+
+  weight_randomness: True
+  personal_patience: 5

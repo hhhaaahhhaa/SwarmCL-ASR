@@ -10,11 +10,13 @@ from src.utils.tool import wer
 
 
 def run_eval(system, output_dir: str):
+    os.makedirs(output_dir, exist_ok=True)
+    system.eval()
+    system.cuda()
     accents = ["aus", "eng", "ind", "ire", "sco"]
     for accent in (accents):
         tname = f"cv-{accent}"
         ds = get_task(tname).test_dataset()
-        system.eval()
 
         long_cnt = 0
         basenames = []
@@ -70,28 +72,21 @@ def log_results(results, output_dir: str):
 
 def main(args):
     output_dir = f"results/benchmark/{args.output_dir}"
-    ckpt_path = "none"
-    if args.exp_dir is None:  # load an empty system (usually a pretrained checkpoint)
+    ckpt_path = args.checkpoint
+    if args.loader == "torch":  # load an empty system first (usually a pretrained checkpoint)
         assert args.config is not None
         system_config = {}
         for path in args.config:
             config = yaml.load(open(path, "r"), Loader=yaml.FullLoader)
             system_config.update(config)
-        exp_root = output_dir
-        system_config["output_dir"] = {
-            "exp_root": exp_root,
-            "log_dir": f"{exp_root}/log",
-            "result_dir": f"{exp_root}/result",
-            "ckpt_dir": f"{exp_root}/ckpt"
-        }
         system_cls = get_system_cls(args.system_name)
         system = system_cls(system_config)
-    else:
-        ckpt_path = f"{args.exp_dir}/{args.checkpoint}"
-        config = yaml.load(open(f"{args.exp_dir}/config.yaml", "r"), Loader=yaml.FullLoader)
-        system_config = config["config"]
-        system_cls = get_system_cls(config["system_name"])
-        system = system_cls.load_from_checkpoint(ckpt_path, config=system_config)
+        if ckpt_path is not None:
+            system.load(path=args.checkpoint)
+    elif args.loader == "lightning":
+        assert ckpt_path is not None, "Please provide checkpoint path when loading with lightning."
+        system_cls = get_system_cls(args.system_name)
+        system = system_cls.load_from_checkpoint(ckpt_path)
 
     print("========================== Start! ==========================")
     print("Output Dir: ", output_dir)
@@ -105,9 +100,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ASR")
     parser.add_argument('-o', '--output_dir', type=str, help="path for evaluated results")
     parser.add_argument('-s', '--system_name', type=str, help="system identifier")
-    parser.add_argument('-n', '--exp_dir', type=str, default=None)
+    # parser.add_argument('-n', '--exp_dir', type=str, default=None)
     parser.add_argument('-c', '--checkpoint', type=str, default=None)
     parser.add_argument('--config', nargs='+', default=["config/system/base.yaml"])
+    parser.add_argument("--loader", type=str, default="torch")
 
     args = parser.parse_args()
     main(args)

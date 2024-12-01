@@ -1,3 +1,4 @@
+import torch
 import lightning as pl
 
 
@@ -7,9 +8,6 @@ class System(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
         self.config = config
-        self.log_dir = config["output_dir"]["log_dir"]
-        self.result_dir = config["output_dir"]["result_dir"]
-        self.ckpt_dir = config["output_dir"]["ckpt_dir"]
 
         self.build_configs()
         self.build_model()
@@ -22,6 +20,15 @@ class System(pl.LightningModule):
         """ Build all components here. """
         pass
 
+    def get_main_module(self) -> torch.nn.Module:
+        raise NotImplementedError
+
+    def save(self, path: str) -> None:
+        torch.save(self.get_main_module().state_dict(), path)
+
+    def load(self, path: str) -> None:
+        self.get_main_module().load_state_dict(torch.load(path))
+    
     def on_load_checkpoint(self, checkpoint: dict) -> None:
         # support loading to a different structure by matching names
         self.test_global_step = checkpoint["global_step"]
