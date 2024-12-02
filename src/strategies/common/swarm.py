@@ -32,6 +32,8 @@ class SwarmExecutor(Generic[T]):
         self.utility_function = utility_function
 
     def _init_search(self, particles: list[T]) -> None:
+        assert self.config["N"] >= len(particles), f"N{self.config['N']} should not less than the number of input particles ({len(particles)})!"
+        self.log("Initialization...")
         self.particles = []
         self.personal_best = []
         self.global_best, self.global_worst = (None, -2e9), (None, 2e9)
@@ -54,7 +56,10 @@ class SwarmExecutor(Generic[T]):
             self.particles.append(new_particle)
         assert len(self.particles) == self.config["N"]
 
-        utilities = [self.utility_function(particle) for particle in self.particles]
+        utilities = []
+        for particle in tqdm(self.particles):
+            utilities.append(self.utility_function(particle))
+        self.log(utilities)
 
         # init personal best, global best/worst
         for idx, (particle, u) in enumerate(zip(self.particles, utilities)):
@@ -76,7 +81,7 @@ class SwarmExecutor(Generic[T]):
 
     def _update_velocity_and_location(self, idx: int) -> None:
         # weight randomness
-        if self.config["weight_randomess"]:
+        if self.config["weight_randomness"]:
             r_w = random.uniform(0, 1)
             r_p = random.uniform(0, 1)
             r_s = random.uniform(0, 1)
@@ -99,7 +104,7 @@ class SwarmExecutor(Generic[T]):
         repel_weight = repel_weight / weight_sum
 
         # update
-        involved_particles = [self.velocities[idx], self.personal_best[idx], self.global_best, self.global_worst, self.particles[idx]]
+        involved_particles = [self.velocities[idx], self.personal_best[idx][0], self.global_best[0], self.global_worst[0], self.particles[idx]]
         coeffs = [self_weight, cognitive_weight, social_weight, -repel_weight, -cognitive_weight-social_weight+repel_weight]
         new_velocity = self.linear_operator(coeffs, involved_particles)
         new_velocity.cache(self.config["cache_dir"], f"{self.current_iteration}:v-{idx}")
@@ -113,7 +118,10 @@ class SwarmExecutor(Generic[T]):
         for idx in range(self.config["N"]):
             self._update_velocity_and_location(idx)
 
-        utilities = [self.utility_function(particle) for particle in self.particles]
+        utilities = []
+        for particle in tqdm(self.particles):
+            utilities.append(self.utility_function(particle))
+        self.log(utilities)
         
         # update personal best, global best/worst
         self.patience += 1
@@ -142,9 +150,16 @@ class SwarmExecutor(Generic[T]):
     
     def run(self, particles: list[T]) -> T:
         self._init_search(particles)
-        for i in tqdm(range(self.config["iterations"])):
+        self.log(f"Iteration {self.current_iteration}:")
+        self.log(f"Global best: {self.global_best[1]}.")
+        for i in tqdm(range(self.config["iterations"]), desc="Iter"):
             self.current_iteration = i + 1
             self._run_one_iteration()
+            self.log(f"Iteration {self.current_iteration}:")
+            self.log(f"Global best: {self.global_best[1]}.")
             if self.patience >= self.config["patience"]:  # early stop
                 break
         return self.global_best[0]
+    
+    def log(self, x):
+        print(f"[Swarm]: {x}")

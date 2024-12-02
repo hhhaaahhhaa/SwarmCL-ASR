@@ -10,12 +10,22 @@ BASIC = {
     
 }
 
+MERGING = {
+    "uniform-soup": (f"{SRC_DIR}/merging.py", "UniformSoup"),
+    "ties": (f"{SRC_DIR}/merging.py", "TIES"),
+    "greedy-soup": (f"{SRC_DIR}/merging.py", "GreedySoup"),
+    "swarm": (f"{SRC_DIR}/merging.py", "ModelSwarm"),
+}
+
 CONTINUAL = {
-    "swarm-cl": (f"{SRC_DIR}/swarm_cl/strategy.py", "SwarmCLStrategy"),
+    "seq-linear": (f"{SRC_DIR}/swarm_cl/strategy.py", "SwarmCLStrategy"),
+    "seq-ties": (f"{SRC_DIR}/swarm_cl/strategy.py", "SwarmCLStrategy"),
+    "seq-swarm": (f"{SRC_DIR}/swarm_cl/strategy.py", "SwarmCLStrategy"),
 }
 
 STRATEGY_MAPPING = {
     **BASIC,
+    **MERGING,
     **CONTINUAL,
 }
 

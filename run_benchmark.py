@@ -100,7 +100,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ASR")
     parser.add_argument('-o', '--output_dir', type=str, help="path for evaluated results")
     parser.add_argument('-s', '--system_name', type=str, help="system identifier")
-    # parser.add_argument('-n', '--exp_dir', type=str, default=None)
     parser.add_argument('-c', '--checkpoint', type=str, default=None)
     parser.add_argument('--config', nargs='+', default=["config/system/base.yaml"])
     parser.add_argument("--loader", type=str, default="torch")

@@ -114,40 +114,43 @@ class Wav2vec2System(System):
         if self.config.get("bitfit", False):
             for np, p in self.model.named_parameters():
                 if str(np).split('.')[1] == 'encoder' and "bias" in np:
-                    p.requires_grad = True
-                    params.append(p)
-                    names.append(np)
+                    if np not in names:
+                        params.append(p)
+                        names.append(np)
         
         for nm, m in self.model.named_modules():
             # print(nm)
-            if self.config["train_LN"]: 
+            if self.config["train_LN"]:
                 if isinstance(m, nn.LayerNorm):
                     for np, p in m.named_parameters():
                         if np in trainable:
-                            if not p.requires_grad:
-                                p.requires_grad = True
+                            name = f"{nm}.{np}"
+                            if name not in names:
                                 params.append(p)
-                                names.append(f"{nm}.{np}")
+                                names.append(name)
+            
             if self.config["train_feature"]:
                 if len(str(nm).split('.')) > 1:
                     if str(nm).split('.')[1] == 'feature_extractor' or str(nm).split('.')[1] == 'feature_projection':
                         for np, p in m.named_parameters():
-                            p.requires_grad = True
-                            params.append(p)
-                            names.append(f"{nm}.{np}")
+                            name = f"{nm}.{np}"
+                            if name not in names:
+                                params.append(p)
+                                names.append(name)
                             
             if self.config["train_all"]: 
                 for np, p in m.named_parameters():
-                    p.requires_grad = True
-                    params.append(p)
-                    names.append(f"{nm}.{np}")
+                    name = f"{nm}.{np}"
+                    if name not in names:
+                        params.append(p)
+                        names.append(name)
 
         return params, names
 
     def configure_optimizers(self):
         self.model.requires_grad_(False)
         params, self.opt_param_names = self._collect_params()
-        # print(param_names[:10])
+        # print(self.opt_param_names[:10])
         for p in params:
             p.requires_grad = True
         print("Optimizable: ", sum(p.numel() for p in self.model.parameters() if p.requires_grad))

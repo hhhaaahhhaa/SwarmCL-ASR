@@ -1,6 +1,6 @@
 swarm:
   iterations: 50
-  N: 20
+  N: 5
   patience: 10
 
   inertia: 0.1

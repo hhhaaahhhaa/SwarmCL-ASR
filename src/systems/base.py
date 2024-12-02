@@ -27,7 +27,7 @@ class System(pl.LightningModule):
         torch.save(self.get_main_module().state_dict(), path)
 
     def load(self, path: str) -> None:
-        self.get_main_module().load_state_dict(torch.load(path))
+        self.get_main_module().load_state_dict(torch.load(path, weights_only=True))
     
     def on_load_checkpoint(self, checkpoint: dict) -> None:
         # support loading to a different structure by matching names

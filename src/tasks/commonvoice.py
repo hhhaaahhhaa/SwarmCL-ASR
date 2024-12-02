@@ -1,4 +1,4 @@
-from torch.utils.data import Dataset, ConcatDataset
+from torch.utils.data import Dataset, ConcatDataset, Subset
 
 from .base import Task, StandardDataset
 
@@ -19,32 +19,32 @@ class CVAccentTask(Task):
         return self._test_dataset
 
 
-class AUSTask(Dataset):
+class AUSTask(Task):
     def __new__(cls):
         return CVAccentTask(accent="aus")
 
 
-class ENGTask(Dataset):
+class ENGTask(Task):
     def __new__(cls):
         return CVAccentTask(accent="eng")
     
 
-class INDTask(Dataset):
+class INDTask(Task):
     def __new__(cls):
         return CVAccentTask(accent="ind")
     
 
-class IRETask(Dataset):
+class IRETask(Task):
     def __new__(cls):
         return CVAccentTask(accent="ire")
     
 
-class SCOTask(Dataset):
+class SCOTask(Task):
     def __new__(cls):
         return CVAccentTask(accent="sco")
     
 
-class USTask(Dataset):
+class USTask(Task):
     def __new__(cls):
         return CVAccentTask(accent="us")
 
@@ -70,3 +70,23 @@ class AllTask(Task):
     
     def test_dataset(self) -> Dataset:
         return self._test_dataset
+
+
+class Val100Task(Task):
+    """ This is only an object. """
+    def __init__(self) -> None:
+        accents = ["aus", "eng", "ind", "ire", "sco"]
+        indices = list(range(20))
+        self._datasets = [
+            Subset(StandardDataset(root=f"_cache/CommonVoice-accent-full/{accent}/dev"), indices=indices)
+        for accent in accents]
+        self._dataset = ConcatDataset(self._datasets)
+
+    def train_dataset(self) -> Dataset:
+        raise NotImplementedError
+
+    def val_dataset(self) -> Dataset:
+        raise NotImplementedError
+    
+    def test_dataset(self) -> Dataset:
+        raise NotImplementedError

@@ -8,7 +8,7 @@ from ..common.interface import IParticle
 
 class ModelParticle(IParticle):
 
-    data: dict[str: torch.Tensor]
+    _data: dict[str: torch.Tensor]
     SAVE_RAM = False
 
     def __init__(self, data: dict[str: torch.Tensor]={}) -> None:
@@ -17,7 +17,7 @@ class ModelParticle(IParticle):
 
     @classmethod
     def dummy(cls) -> IParticle:
-        return cls.__new__()
+        return cls()
     
     def is_dummy(self) -> bool:
         return True if (not self._data and self._cache_path is None) else False
@@ -67,9 +67,10 @@ def system2particle(system: Wav2vec2System) -> ModelParticle:
     return ModelParticle(data)
 
 
-def particle2system(particle: ModelParticle) -> Wav2vec2System:
-    # load a pretrained Wav2vec2System
-    for name, param in particle.data.items():
-        # replace parameters from particle's data
-        pass
-    return None
+def particle2system(particle: ModelParticle, ref_system: Wav2vec2System) -> Wav2vec2System:
+    """ require an reference system object since particle only contains weight information """
+    state_dict = ref_system.model.state_dict()
+    for name, param in particle.get_data().items():
+        state_dict[name] = param.detach().clone().to(ref_system.device)
+    ref_system.model.load_state_dict(state_dict)
+    return ref_system
