@@ -4,11 +4,11 @@ opt: AdamW
 lr: 0.0001
 scheduler: null
 
-train_feature: True
-train_LN: True
-train_all: False
-reweight: True
-bias_only: False
+# train_all: False
+train_transformer: True
+# train_feature: True
+# train_LN: True
+# bias_only: False
 
 train_config:
   num_train_epochs: 10

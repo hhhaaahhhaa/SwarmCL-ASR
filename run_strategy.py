@@ -68,7 +68,15 @@ if __name__ == "__main__":
     parser.add_argument('-t', '--task_name', type=str, help="task identifier")  # note that this is a meta data object
     parser.add_argument('-n', '--exp_name', type=str, default="unnamed_strategy")
     parser.add_argument('--config', nargs='+', default=[])
+    parser.add_argument('--run10', action="store_true", default=False)
 
     args = parser.parse_args()
-    seed_everything(666)
-    main(args)
+    if args.run10:
+        tmp = args.exp_name
+        for i in range(10):
+            seed_everything(666+i)
+            args.exp_name = f"{tmp}/run-{i}"
+            main(args)
+    else:
+        seed_everything(666)
+        main(args)

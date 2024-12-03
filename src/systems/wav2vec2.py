@@ -105,12 +105,29 @@ class Wav2vec2System(System):
         """
         params = []
         names = []
-        trainable = []
-        if self.config["bias_only"]:
-            trainable = ['bias']
-        else: 
-            trainable = ['weight', 'bias']
+        # determine by tag
+        if self.config.get("train_all", False):
+            for nm, m in self.model.named_modules():
+                for np, p in m.named_parameters():
+                    name = f"{nm}.{np}"
+                    if name not in names:
+                        params.append(p)
+                        names.append(name)
+            return params, names
 
+        if self.config.get("train_transformer", False):
+            for nm, m in self.model.named_modules():
+                if len(str(nm).split('.')) > 1:  # fix cnn
+                    if str(nm).split('.')[1] == 'feature_extractor' or str(nm).split('.')[1] == 'feature_projection':
+                        continue
+                for np, p in m.named_parameters():
+                    name = f"{nm}.{np}"
+                    params.append(p)
+                    names.append(name)
+            return params, names
+
+        # determine by other combinations
+        trainable = ['bias'] if self.config["bias_only"] else ['weight', 'bias']
         if self.config.get("bitfit", False):
             for np, p in self.model.named_parameters():
                 if str(np).split('.')[1] == 'encoder' and "bias" in np:
@@ -137,13 +154,6 @@ class Wav2vec2System(System):
                             if name not in names:
                                 params.append(p)
                                 names.append(name)
-                            
-            if self.config["train_all"]: 
-                for np, p in m.named_parameters():
-                    name = f"{nm}.{np}"
-                    if name not in names:
-                        params.append(p)
-                        names.append(name)
 
         return params, names
 

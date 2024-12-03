@@ -146,7 +146,10 @@ class SwarmExecutor(Generic[T]):
                     self.particles[idx] = self.personal_best[idx][0]
                     self.particles[idx].cache(self.config["cache_dir"], f"{self.current_iteration}:loc-{idx}")
                     self.velocities[idx] = self.cls_type.dummy()
-                    self.velocities[idx].cache(self.config["cache_dir"], f"{self.current_iteration}:v-{idx}")              
+                    self.velocities[idx].cache(self.config["cache_dir"], f"{self.current_iteration}:v-{idx}")
+
+        # step length schedule
+        self.step_length = self.step_length * self.config.get("step_length_schedule", 1.0)        
     
     def run(self, particles: list[T]) -> T:
         self._init_search(particles)
