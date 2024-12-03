@@ -107,23 +107,17 @@ class Wav2vec2System(System):
         names = []
         # determine by tag
         if self.config.get("train_all", False):
-            for nm, m in self.model.named_modules():
-                for np, p in m.named_parameters():
-                    name = f"{nm}.{np}"
-                    if name not in names:
-                        params.append(p)
-                        names.append(name)
+            for np, p in self.model.named_parameters():
+                params.append(p)
+                names.append(np)
             return params, names
 
         if self.config.get("train_transformer", False):
-            for nm, m in self.model.named_modules():
-                if len(str(nm).split('.')) > 1:  # fix cnn
-                    if str(nm).split('.')[1] == 'feature_extractor' or str(nm).split('.')[1] == 'feature_projection':
-                        continue
-                for np, p in m.named_parameters():
-                    name = f"{nm}.{np}"
-                    params.append(p)
-                    names.append(name)
+            for np, p in self.model.named_parameters():
+                if np.startswith("wav2vec2.feature_extractor") or np.startswith("wav2vec2.feature_projection"):
+                    continue
+                params.append(p)
+                names.append(np)
             return params, names
 
         # determine by other combinations
