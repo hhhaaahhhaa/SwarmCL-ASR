@@ -159,10 +159,29 @@ class Wav2vec2System(System):
             p.requires_grad = True
         print("Optimizable: ", sum(p.numel() for p in self.model.parameters() if p.requires_grad))
 
-        self.optimizer, self.scheduler = setup_optimizer(
+        opt = getattr(torch.optim, self.config["opt"])
+        print(f'[INFO]    optimizer: {opt}')
+        print(f'[INFO]    scheduler: {self.config["scheduler"]}')
+        self.optimizer = opt(
             params,
-            self.config["opt"], self.config["lr"], scheduler=self.config["scheduler"]
+            lr=self.config["lr"],
+            weight_decay=self.config["train_config"].get("weight_decay", 0.0)
         )
+        if self.config["scheduler"] is None:
+            self.scheduler = None
+        elif self.config["scheduler"] == "linear":
+            self.scheduler = {
+                "scheduler": torch.optim.lr_scheduler.LinearLR(
+                    self.optimizer,
+                    start_factor=1.0,
+                    end_factor=0.0,
+                    total_iters=self.config["train_config"]["num_train_epochs"]
+                ),
+                "interval": "epoch",
+            }
+        else:
+            raise NotImplementedError
+
         if self.scheduler is None:
             return {"optimizer": self.optimizer}
         return {
@@ -212,22 +231,22 @@ class Wav2vec2System(System):
         return self.model
 
 
-def setup_optimizer(params, opt_name='AdamW', lr=1e-4, beta=0.9, weight_decay=0., scheduler=None, step_size=1, gamma=0.7):
-    opt = getattr(torch.optim, opt_name)
-    print(f'[INFO]    optimizer: {opt}')
-    print(f'[INFO]    scheduler: {scheduler}')
-    if opt_name == 'Adam':       
-        optimizer = opt(params,
-                lr=lr,
-                betas=(beta, 0.999),
-                weight_decay=weight_decay)
-    else: 
-        optimizer = opt(params, lr=lr, weight_decay=weight_decay)
+# def setup_optimizer(params, opt_name='AdamW', lr=1e-4, beta=0.9, weight_decay=0., scheduler=None, step_size=1, gamma=0.7):
+#     opt = getattr(torch.optim, opt_name)
+#     print(f'[INFO]    optimizer: {opt}')
+#     print(f'[INFO]    scheduler: {scheduler}')
+#     if opt_name == 'Adam':       
+#         optimizer = opt(params,
+#                 lr=lr,
+#                 betas=(beta, 0.999),
+#                 weight_decay=weight_decay)
+#     else: 
+#         optimizer = opt(params, lr=lr, weight_decay=weight_decay)
     
-    if scheduler is not None: 
-        return optimizer, eval(scheduler)(optimizer, step_size=step_size, gamma=gamma)
-    else: 
-        return optimizer, None
+#     if scheduler is not None: 
+#         return optimizer, eval(scheduler)(optimizer, step_size=step_size, gamma=gamma)
+#     else: 
+#         return optimizer, None
 
 
 class Saver(Callback):

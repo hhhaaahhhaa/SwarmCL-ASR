@@ -13,9 +13,11 @@ from src.tasks.load import get_task
 
 def get_data_obj(task_name: str):
     if task_name == "none":
-        return None
+        return (task_name, None)
     elif task_name == "cv-val100":
-        return get_task("cv-val100")
+        return (task_name, get_task("cv-val100")._dataset)
+    elif task_name == "cv-seq":
+        raise NotImplementedError # TODO
     else:
         raise NotImplementedError
 

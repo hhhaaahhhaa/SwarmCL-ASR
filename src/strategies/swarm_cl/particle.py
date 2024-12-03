@@ -2,6 +2,7 @@ import os
 import torch
 import pickle
 
+from src.systems.base import System
 from src.systems.wav2vec2 import Wav2vec2System
 from ..common.interface import IParticle
 
@@ -59,7 +60,8 @@ def linear_combination(coefficients: list[float], particles: list[ModelParticle]
     return ModelParticle(data)
 
 
-def system2particle(system: Wav2vec2System) -> ModelParticle:
+def system2particle(system: System) -> ModelParticle:
+    assert isinstance(system, Wav2vec2System)
     data = {}
     params, names = system._collect_params()
     for (name, param) in zip(names, params):
@@ -67,8 +69,9 @@ def system2particle(system: Wav2vec2System) -> ModelParticle:
     return ModelParticle(data)
 
 
-def particle2system(particle: ModelParticle, ref_system: Wav2vec2System) -> Wav2vec2System:
+def particle2system(particle: ModelParticle, ref_system: System) -> System:
     """ require an reference system object since particle only contains weight information """
+    assert isinstance(ref_system, Wav2vec2System)
     state_dict = ref_system.model.state_dict()
     for name, param in particle.get_data().items():
         state_dict[name] = param.detach().clone().to(ref_system.device)

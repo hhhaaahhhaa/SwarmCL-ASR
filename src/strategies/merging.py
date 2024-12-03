@@ -68,7 +68,9 @@ class GreedySoup(IStrategy):
         return -word_error_rate
     
     def run(self, data_obj):
-        utilities = [self.eval_particle(particle, data_obj._dataset) for particle in self.info["particles"]]
+        task_name, data_obj = data_obj
+        assert task_name in ["cv-val100"]
+        utilities = [self.eval_particle(particle, data_obj) for particle in self.info["particles"]]
         p_and_u = sorted(list(zip(self.info["particles"], utilities)), key=lambda x: x[1], reverse=True)
         
         soup = [p_and_u[0][0]]
@@ -79,7 +81,7 @@ class GreedySoup(IStrategy):
         self.log(f"Global best: {global_best[1]}.")
         for i in range(1, len(p_and_u)):
             merged_particle = linear_combination([1.0 / (len(soup) + 1)] * (len(soup) + 1), [*soup, p_and_u[i][0]])
-            u = self.eval_particle(merged_particle, data_obj._dataset)  # currently depend on cls(data_obj)
+            u = self.eval_particle(merged_particle, data_obj)  # currently depend on cls(data_obj)
             if u > global_best[1]:
                 soup.append(p_and_u[i][0])
                 record["soup_idx"].append(i)
@@ -115,13 +117,15 @@ class ModelSwarm(IStrategy):
         return -word_error_rate
     
     def run(self, data_obj):
+        task_name, data_obj = data_obj
+        assert task_name in ["cv-val100"]
         swarm_config = copy.deepcopy(self.config["strategy_config"]["swarm"])
         swarm_config["cache_dir"] = f"{self.config['output_dir']['log_dir']}/cache"
         swarm_executor = SwarmExecutor(
             swarm_config,
             cls_type=ModelParticle,
             linear_operator=linear_combination,
-            utility_function=partial(self.eval_particle, ds=data_obj._dataset)  # currently depend on cls(data_obj)
+            utility_function=partial(self.eval_particle, ds=data_obj)  # currently depend on cls(data_obj)
         )
         merged_particle = swarm_executor.run(self.info["particles"])
         merged_system = particle2system(merged_particle, ref_system=self.info["ref_system"])

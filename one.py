@@ -38,19 +38,45 @@ def create_config(args):
     return res
 
 
-def train_one_task(config: dict, debug: bool=False):
+def load_system(system_name: str, system_config=None, checkpoint=None, loader="torch"):
+    system_cls = get_system_cls(system_name)
+    if checkpoint is None:
+        assert system_config is not None, "Please provide config when creating system from scratch."
+        return system_cls(system_config)
+    print(f'Load from {checkpoint}...')
+    if loader == "torch":
+        assert system_config is not None, "Please provide config when loading checkpoint from torch."
+        system = system_cls(system_config)
+        system.load(checkpoint)
+        return system
+    elif loader == "lightning":
+        if system_config is None:
+            return system_cls.load_from_checkpoint(checkpoint)
+        else:
+            return system_cls.load_from_checkpoint(checkpoint, config=system_config)
+    else:
+        raise NotImplementedError
+
+
+def train_one_task(config: dict, loader="torch", debug: bool=False):
     # Init system
     system_config = config["config"]
-    system_cls = get_system_cls(config["system_name"])
-    if config.get("checkpoint", None) is not None:
-        try:
-            print(f'Load from {config["checkpoint"]}...')
-            system = system_cls.load_from_checkpoint(config["checkpoint"], config=system_config)  # ONLY load weights and overwrite config
-        except:
-            print(f'System {config["system_name"]} fails/unsupports checkpoint loading.')
-            exit()
-    else:
-        system = system_cls(system_config)
+    system = load_system(
+        system_name=config["system_name"],
+        system_config=system_config,
+        checkpoint=config.get("checkpoint", None),
+        loader=loader
+    )
+    # system_cls = get_system_cls(config["system_name"])
+    # if config.get("checkpoint", None) is not None:
+    #     try:
+    #         print(f'Load from {config["checkpoint"]}...')
+    #         system = system_cls.load_from_checkpoint(config["checkpoint"], config=system_config)  # ONLY load weights and overwrite config
+    #     except:
+    #         print(f'System {config["system_name"]} fails/unsupports checkpoint loading.')
+    #         exit()
+    # else:
+    #     system = system_cls(system_config)
     if debug:
         print("System module prepared.")
         input()
@@ -111,7 +137,7 @@ def main(args):
     config = create_config(args)
     if args.debug:
         print("Configuration: ", config)
-    train_one_task(config, debug=args.debug)
+    train_one_task(config, loader="lightning", debug=args.debug)
 
 
 if __name__ == "__main__":
