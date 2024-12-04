@@ -4,9 +4,9 @@ import yaml
 import pickle
 from tqdm import tqdm
 
-from src.systems.load import get_system_cls
 from src.tasks.load import get_task
 from src.utils.tool import wer
+from one import load_system
 
 
 def run_eval(system, output_dir: str):
@@ -72,26 +72,24 @@ def log_results(results, output_dir: str):
 
 def main(args):
     output_dir = f"results/benchmark/{args.output_dir}"
-    ckpt_path = args.checkpoint
-    if args.loader == "torch":  # load an empty system first (usually a pretrained checkpoint)
-        assert args.config is not None
+    if args.loader == "torch":
         system_config = {}
         for path in args.config:
             config = yaml.load(open(path, "r"), Loader=yaml.FullLoader)
             system_config.update(config)
-        system_cls = get_system_cls(args.system_name)
-        system = system_cls(system_config)
-        if ckpt_path is not None:
-            system.load(path=args.checkpoint)
-    elif args.loader == "lightning":
-        assert ckpt_path is not None, "Please provide checkpoint path when loading with lightning."
-        system_cls = get_system_cls(args.system_name)
-        system = system_cls.load_from_checkpoint(ckpt_path)
+    else:
+        system_config = None
+    system = load_system(
+        system_name=args.system_name,
+        system_config=system_config,
+        checkpoint=args.checkpoint,
+        loader=args.loader
+    )
 
     print("========================== Start! ==========================")
     print("Output Dir: ", output_dir)
     print("System name: ", args.system_name)
-    print("Checkpoint Path: ", ckpt_path)
+    print("Checkpoint Path: ", args.checkpoint)
 
     run_eval(system, output_dir=output_dir)
 

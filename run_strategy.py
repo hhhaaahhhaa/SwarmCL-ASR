@@ -17,7 +17,7 @@ def get_data_obj(task_name: str):
     elif task_name == "cv-val100":
         return (task_name, get_task("cv-val100")._dataset)
     elif task_name == "cv-seq":
-        raise NotImplementedError # TODO
+        raise (task_name, get_task("cv-seq"))
     else:
         raise NotImplementedError
 

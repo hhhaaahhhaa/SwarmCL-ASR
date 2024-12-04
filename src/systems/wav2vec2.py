@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor, Wav2Vec2ProcessorWithLM
 import json
-from lightning.pytorch.callbacks import ModelCheckpoint, Callback
+from lightning.pytorch.callbacks import ModelCheckpoint, Callback, LearningRateMonitor
 from lightning.pytorch.loggers.logger import merge_dicts
 
 from .base import System
@@ -179,6 +179,30 @@ class Wav2vec2System(System):
                 ),
                 "interval": "epoch",
             }
+        elif self.config["scheduler"] == "linear-warmup":
+            def get_schedule(start_factor: float=1.0, end_factor: float=0.0, total_steps: int=100, warmup_steps: int=0):
+                assert total_steps > warmup_steps, f"Total steps({total_steps}) should be larger warmup steps({warmup_steps})!"
+                def factor(current_step: int) -> float:
+                    if current_step < warmup_steps:
+                        return current_step / warmup_steps * start_factor
+                    r = (current_step - warmup_steps) / (total_steps - warmup_steps)
+                    res = (1 - r) * start_factor + r * end_factor
+                    return res
+                return factor
+            if "warmup_ratio" in self.config["train_config"]:
+                warmup_steps = int(self.config["train_config"]["warmup_ratio"] * self.trainer.estimated_stepping_batches)
+            else:
+                warmup_steps = self.config["train_config"].get("warmup_steps", 0)
+            self.scheduler = {
+                "scheduler": torch.optim.lr_scheduler.LambdaLR(
+                    self.optimizer,
+                    lr_lambda=get_schedule(
+                        total_steps=self.trainer.estimated_stepping_batches,
+                        warmup_steps=warmup_steps
+                    ),
+                ),
+                "interval": "step",
+            }
         else:
             raise NotImplementedError
 
@@ -195,12 +219,18 @@ class Wav2vec2System(System):
             dirpath=self.config["output_dir"]["ckpt_dir"],
             monitor="Val/Total Loss", mode="min",
             save_top_k=1,
-            save_last=True,
             filename='{epoch}'
         )
+        best = ModelCheckpoint(
+            dirpath=self.config["output_dir"]["ckpt_dir"],
+            monitor="Val/Total Loss", mode="min",
+            save_top_k=1,
+            filename='best'
+        )
         saver = Saver(self.config["output_dir"])
+        # lr_monitor = LearningRateMonitor()
         
-        return [checkpoint, saver]
+        return [checkpoint, best, saver]
 
     # inference
     @torch.no_grad()
@@ -229,24 +259,6 @@ class Wav2vec2System(System):
     
     def get_main_module(self):
         return self.model
-
-
-# def setup_optimizer(params, opt_name='AdamW', lr=1e-4, beta=0.9, weight_decay=0., scheduler=None, step_size=1, gamma=0.7):
-#     opt = getattr(torch.optim, opt_name)
-#     print(f'[INFO]    optimizer: {opt}')
-#     print(f'[INFO]    scheduler: {scheduler}')
-#     if opt_name == 'Adam':       
-#         optimizer = opt(params,
-#                 lr=lr,
-#                 betas=(beta, 0.999),
-#                 weight_decay=weight_decay)
-#     else: 
-#         optimizer = opt(params, lr=lr, weight_decay=weight_decay)
-    
-#     if scheduler is not None: 
-#         return optimizer, eval(scheduler)(optimizer, step_size=step_size, gamma=gamma)
-#     else: 
-#         return optimizer, None
 
 
 class Saver(Callback):

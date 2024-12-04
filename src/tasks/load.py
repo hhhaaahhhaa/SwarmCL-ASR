@@ -14,6 +14,7 @@ CV_ACCENT = {
     "cv-all": (f"{SRC_DIR}/commonvoice.py", "AllTask"),
 
     "cv-val100": (f"{SRC_DIR}/commonvoice.py", "Val100Task"),
+    "cv-seq": (f"{SRC_DIR}/commonvoice.py", "CVSequence"),
 }
 
 EXP = {
