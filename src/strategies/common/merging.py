@@ -15,7 +15,8 @@ def quantile(x: torch.Tensor, q: float) -> torch.Tensor:  # https://github.com/p
 
 class TIES(object):
     """ TIES merging for 1D vector. """
-    def __init__(self, density=1.0) -> None:
+    def __init__(self, lamb: float, density: float=1.0) -> None:
+        self.lamb = lamb
         self.density = density
     
     def get_tv(self, ref_vector: torch.Tensor, vector: torch.Tensor) -> torch.Tensor:
@@ -43,4 +44,4 @@ class TIES(object):
         tvs = [self.get_tv(ref_vector, vector) for vector in vectors]
         tvs = [self.prune(tv) for tv in tvs]
         sign = self.resolve_sign(tvs)
-        return self.disjoint_merge(tvs, sign)
+        return ref_vector + self.lamb * self.disjoint_merge(tvs, sign)

@@ -68,16 +68,15 @@ class TIES(IStrategy):
             torch.nn.utils.vector_to_parameters(vector, ref_state_dict.values())
             return ModelParticle(ref_state_dict)
 
-        executor = merging.TIES(density=self.config["strategy_config"]["density"])
-        merged_task_vector = executor.merge(
+        executor = merging.TIES(
+            lamb=self.config["strategy_config"]["lambda"],
+            density=self.config["strategy_config"]["density"]
+        )
+        merged_vector = executor.merge(
             ref_vector=particle2vector(system2particle(self.info["ref_system"])),
             vectors=[particle2vector(p) for p in self.info["particles"]]
         )
-        merged_particle = linear_combination(
-            [1, self.config["strategy_config"]["lambda"]],
-            [system2particle(self.info["ref_system"]), vector2particle(merged_task_vector)]
-        )
-        merged_system = particle2system(merged_particle, ref_system=self.info["ref_system"])
+        merged_system = particle2system(vector2particle(merged_vector), ref_system=self.info["ref_system"])
         merged_system.save(f"{self.config['output_dir']['ckpt_dir']}/merged.ckpt")
 
 

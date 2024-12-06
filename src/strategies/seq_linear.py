@@ -1,3 +1,4 @@
+import os
 import copy
 import yaml
 
@@ -46,6 +47,7 @@ class SeqLinearStrategy(IStrategy):
             "config": copy.deepcopy(self.config["system_config"]),
         }
         exp_root = self._get_exp_root(tid)
+        os.makedirs(exp_root, exist_ok=True)
         task_config["config"]["output_dir"] = {
             "exp_root": exp_root,
             "log_dir": f"{exp_root}/log",
