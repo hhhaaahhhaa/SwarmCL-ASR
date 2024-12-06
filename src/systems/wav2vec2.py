@@ -219,13 +219,15 @@ class Wav2vec2System(System):
             dirpath=self.config["output_dir"]["ckpt_dir"],
             monitor="Val/Total Loss", mode="min",
             save_top_k=1,
-            filename='{epoch}'
+            filename='{epoch}',
+            save_weights_only=True,
         )
         best = ModelCheckpoint(
             dirpath=self.config["output_dir"]["ckpt_dir"],
             monitor="Val/Total Loss", mode="min",
             save_top_k=1,
-            filename='best'
+            filename='best',
+            save_weights_only=True,
         )
         saver = Saver(self.config["output_dir"])
         # lr_monitor = LearningRateMonitor()

@@ -32,6 +32,10 @@ def create_config(args):
     for path in args.config:
         strategy_config = yaml.load(open(path, "r"), Loader=yaml.FullLoader)
         res["strategy_config"].update(strategy_config)
+    res["system_config"] = {}
+    for path in args.system_config:
+        system_config = yaml.load(open(path, "r"), Loader=yaml.FullLoader)
+        res["system_config"].update(system_config)
     
     exp_name = args.exp_name
     exp_root = f"results/{exp_name}"  # maximum flexibility
@@ -70,6 +74,7 @@ if __name__ == "__main__":
     parser.add_argument('-t', '--task_name', type=str, help="task identifier")  # note that this is a meta data object
     parser.add_argument('-n', '--exp_name', type=str, default="unnamed_strategy")
     parser.add_argument('--config', nargs='+', default=[])
+    parser.add_argument('--system_config', nargs='+', default=["config/system/base.yaml"])
     parser.add_argument('--run10', action="store_true", default=False)
 
     args = parser.parse_args()

@@ -25,7 +25,7 @@ class SeqLinearStrategy(IStrategy):
     def _get_ft_system(self, tid: int):
         return load_system(
             system_name=self.config["strategy_config"]["system_name"],
-            checkpoint=f"{self._get_exp_root(tid)}/ckpt/last.ckpt",
+            checkpoint=f"{self._get_exp_root(tid)}/ckpt/best.ckpt",
             loader="lightning"
         )
 

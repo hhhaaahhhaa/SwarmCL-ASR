@@ -1,13 +1,16 @@
+import torch
 from tqdm import tqdm
 import copy
 import yaml
 import json
 from functools import partial
 
+from one import load_system
 from src.systems.load import get_system_cls
 from src.strategies.base import IStrategy
 from src.utils.tool import wer
 from .common.swarm import SwarmExecutor
+from .common import merging
 from .swarm_cl.particle import ModelParticle, linear_combination, system2particle, particle2system
 
 
@@ -15,14 +18,19 @@ def load_exp0_results():
     res = {}
     particles = []
     for accent in ["aus", "eng", "ind", "ire", "sco"]:
-        ckpt_path = f"results/exp0/{accent}/ckpt/last.ckpt"
+        ckpt_path = f"results/exp0/{accent}/ckpt/best.ckpt"
         config = yaml.load(open(f"results/exp0/{accent}/config.yaml", "r"), Loader=yaml.FullLoader)
         system_cls = get_system_cls(config["system_name"])
         system = system_cls.load_from_checkpoint(ckpt_path)
         particles.append(system2particle(system))
         # print(len(particles[-1].get_data().keys()))
     res["particles"] = particles
-    res["ref_system"] = system
+
+    # load pretrained system used in exp0
+    res["ref_system"] = load_system(
+        system_name="wav2vec2",
+        system_config=yaml.load(open("config/system/base.yaml", "r"), Loader=yaml.FullLoader)
+    )
     return res
 
 
@@ -33,6 +41,7 @@ class UniformSoup(IStrategy):
         self.info = load_exp0_results()
 
     def run(self, data_obj):
+        task_name, data_obj = data_obj
         assert data_obj is None
         n = len(self.info["particles"])
         merged_particle = linear_combination([1.0 / n] * n, self.info["particles"])
@@ -45,9 +54,31 @@ class TIES(IStrategy):
         self.config = config
 
         self.info = load_exp0_results()
-
+    
     def run(self, data_obj):
+        task_name, data_obj = data_obj
         assert data_obj is None
+
+        # define transformation
+        def particle2vector(p: ModelParticle) -> torch.Tensor:
+            state_dict = p.get_data()
+            return torch.nn.utils.parameters_to_vector(state_dict.values())
+        def vector2particle(vector: torch.Tensor) -> ModelParticle:
+            ref_state_dict = system2particle(self.info["ref_system"]).get_data()
+            torch.nn.utils.vector_to_parameters(vector, ref_state_dict.values())
+            return ModelParticle(ref_state_dict)
+
+        executor = merging.TIES(density=self.config["strategy_config"]["density"])
+        merged_task_vector = executor.merge(
+            ref_vector=particle2vector(system2particle(self.info["ref_system"])),
+            vectors=[particle2vector(p) for p in self.info["particles"]]
+        )
+        merged_particle = linear_combination(
+            [1, self.config["strategy_config"]["lambda"]],
+            [system2particle(self.info["ref_system"]), vector2particle(merged_task_vector)]
+        )
+        merged_system = particle2system(merged_particle, ref_system=self.info["ref_system"])
+        merged_system.save(f"{self.config['output_dir']['ckpt_dir']}/merged.ckpt")
 
 
 class GreedySoup(IStrategy):

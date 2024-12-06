@@ -9,38 +9,43 @@ from src.utils.tool import wer
 from one import load_system
 
 
-def run_eval(system, output_dir: str):
-    os.makedirs(output_dir, exist_ok=True)
+def run_single_task(system, output_dir: str, tname: str):
     system.eval()
     system.cuda()
+
+    ds = get_task(tname).test_dataset()
+
+    long_cnt = 0
+    basenames = []
+    n_words = []
+    errs = []
+    transcriptions = []
+    for sample in tqdm(ds, desc=tname):
+        if len(sample["wav"]) > 320000:  # 20s
+            long_cnt += 1
+            continue
+        n_words.append(len(sample["text"].split(" ")))
+        trans = system.inference([sample["wav"]])
+        err = wer(sample["text"], trans[0])
+        errs.append(err)
+        transcriptions.append((sample["text"], trans[0]))
+        basenames.append(sample["id"])
+
+    results = {
+        "wers": errs,
+        "n_words": n_words,
+        "transcriptions": transcriptions,
+        "basenames": basenames,
+    }
+    log_results(results, f"{output_dir}/{tname}")
+
+
+def run_eval(system, output_dir: str):
+    os.makedirs(output_dir, exist_ok=True)
     accents = ["aus", "eng", "ind", "ire", "sco"]
     for accent in (accents):
-        tname = f"cv-{accent}"
-        ds = get_task(tname).test_dataset()
-
-        long_cnt = 0
-        basenames = []
-        n_words = []
-        errs = []
-        transcriptions = []
-        for sample in tqdm(ds, desc=accent):
-            if len(sample["wav"]) > 320000:  # 20s
-                long_cnt += 1
-                continue
-            n_words.append(len(sample["text"].split(" ")))
-            trans = system.inference([sample["wav"]])
-            err = wer(sample["text"], trans[0])
-            errs.append(err)
-            transcriptions.append((sample["text"], trans[0]))
-            basenames.append(sample["id"])
-
-        results = {
-            "wers": errs,
-            "n_words": n_words,
-            "transcriptions": transcriptions,
-            "basenames": basenames,
-        }
-        log_results(results, f"{output_dir}/{accent}")
+        run_single_task(system, output_dir, tname=f"cv-{accent}")
+    run_single_task(system, output_dir, tname="cv-all")
 
 
 def calc_wer(results: dict) -> float:

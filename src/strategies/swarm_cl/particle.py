@@ -61,7 +61,7 @@ def linear_combination(coefficients: list[float], particles: list[ModelParticle]
 
 
 def system2particle(system: System) -> ModelParticle:
-    assert isinstance(system, Wav2vec2System)
+    # assert isinstance(system, Wav2vec2System)
     data = {}
     params, names = system._collect_params()
     for (name, param) in zip(names, params):
@@ -71,7 +71,7 @@ def system2particle(system: System) -> ModelParticle:
 
 def particle2system(particle: ModelParticle, ref_system: System) -> System:
     """ require an reference system object since particle only contains weight information """
-    assert isinstance(ref_system, Wav2vec2System)
+    # assert isinstance(ref_system, Wav2vec2System)
     state_dict = ref_system.model.state_dict()
     for name, param in particle.get_data().items():
         state_dict[name] = param.detach().clone().to(ref_system.device)
