@@ -37,28 +37,31 @@ class SeqLinearStrategy(IStrategy):
             loader="torch"
         )
 
+    def _finetune(self, tid: int, task_name: str):
+        # create full configuration
+        task_config = {
+            "system_name": self.config["strategy_config"]["system_name"],
+            "task_name": task_name,
+            "checkpoint": None if tid == 0 else self._get_checkpoint_path(tid-1),
+            "config": copy.deepcopy(self.config["system_config"]),
+        }
+        exp_root = self._get_exp_root(tid)
+        task_config["config"]["output_dir"] = {
+            "exp_root": exp_root,
+            "log_dir": f"{exp_root}/log",
+            "result_dir": f"{exp_root}/result",
+            "ckpt_dir": f"{exp_root}/ckpt"
+        }
+        with open(f"{exp_root}/config.yaml", "w", encoding="utf-8") as f:
+            yaml.dump(task_config, f, sort_keys=False)
+        
+        train_one_task(task_config, loader="torch")
+
     def run(self, data_obj):
         task_name, data_obj = data_obj
         assert task_name in ["cv-seq"]
         for tid, task_name in enumerate(data_obj.task_names):
-            # create full configuration
-            task_config = {
-                "system_name": self.config["strategy_config"]["system_name"],
-                "task_name": task_name,
-                "checkpoint": None if tid == 0 else self._get_checkpoint_path(tid-1),
-                "config": copy.deepcopy(self.config["system_config"]),
-            }
-            exp_root = self._get_exp_root(tid)
-            task_config["config"]["output_dir"] = {
-                "exp_root": exp_root,
-                "log_dir": f"{exp_root}/log",
-                "result_dir": f"{exp_root}/result",
-                "ckpt_dir": f"{exp_root}/ckpt"
-            }
-            with open(f"{exp_root}/config.yaml", "w", encoding="utf-8") as f:
-                yaml.dump(task_config, f, sort_keys=False)
-            
-            train_one_task(task_config, loader="torch")
+            self._finetune(tid, task_name)
 
             # merge
             prev_system = self._get_merged_system(tid-1) if tid > 0 else self._get_initial_system()
