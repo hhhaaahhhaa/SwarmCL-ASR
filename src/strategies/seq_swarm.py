@@ -64,8 +64,9 @@ class SeqSwarmStrategy(IStrategy):
         train_one_task(task_config, loader="torch")
 
     def _eval_particle(self, particle: ModelParticle, ds) -> float:
-        ref_system = self._get_initial_system()
-        system = particle2system(particle, ref_system=ref_system)
+        if getattr(self, "ref_system_for_eval", None) is None:
+            self.ref_system_for_eval = self._get_initial_system()
+        system = particle2system(particle, ref_system=self.ref_system_for_eval)
         system.eval()
         system.cuda()
         gt, predictions = [], []
