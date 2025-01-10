@@ -2,16 +2,16 @@
 import os
 import copy
 import yaml
-from functools import partial
+import json
+from tqdm import tqdm
 
 from one import train_one_task, load_system
 from src.strategies.base import IStrategy
 from src.utils.tool import wer
-from .common.swarm import SwarmExecutor
 from .swarm_cl.particle import ModelParticle, linear_combination, system2particle, particle2system
 
 
-class SeqSwarmStrategy(IStrategy):
+class SeqGreedySoupStrategy(IStrategy):
     def __init__(self, config) -> None:
         self.config = config
 
@@ -106,16 +106,30 @@ class SeqSwarmStrategy(IStrategy):
             self._finetune(tid, task_name)
 
             # merge
-            swarm_config = copy.deepcopy(self.config["strategy_config"]["swarm"])
-            swarm_config["cache_dir"] = f"{self._get_exp_root(tid)}/cache"
-            swarm_executor = SwarmExecutor(
-                swarm_config,
-                cls_type=ModelParticle,
-                linear_operator=linear_combination,
-                utility_function=partial(self._eval_particle, ds=data_obj.get_buffer(tid))  # memory buffer as model swarm validation set
-            )
-
             particles = self._load_particles(tid)
-            merged_particle = swarm_executor.run(particles)
-            merged_system = particle2system(merged_particle, ref_system=self._get_initial_system())
+            valset = data_obj.get_buffer(tid)
+            utilities = [self._eval_particle(particle, valset) for particle in particles]
+            p_and_u = sorted(list(zip(particles, utilities)), key=lambda x: x[1], reverse=True)
+            
+            soup = [p_and_u[0][0]]
+            global_best = p_and_u[0]
+            record = {"soup_idx": [0], "utility": [global_best[1]]}
+            self.log(f"Iteration 1:")
+            self.log(f"Soup indices: {record['soup_idx']}.")
+            self.log(f"Global best: {global_best[1]}.")
+            for i in tqdm(range(1, len(p_and_u))):
+                merged_particle = linear_combination([1.0 / (len(soup) + 1)] * (len(soup) + 1), [*soup, p_and_u[i][0]])
+                u = self._eval_particle(merged_particle, valset)
+                if u > global_best[1]:
+                    soup.append(p_and_u[i][0])
+                    record["soup_idx"].append(i)
+                    global_best = (merged_particle, u)
+                record["utility"].append(global_best[1])
+            self.log(f"Global best: {global_best[1]}.")
+            with open(f"{self._get_exp_root(tid)}/record.json", "w") as f:
+                json.dump(record, f, indent=4)
+            merged_system = particle2system(global_best[0], ref_system=self._get_initial_system())
             merged_system.save(self._get_checkpoint_path(tid))
+
+    def log(self, x):
+        print(f"[Sequential GreedySoup]: {x}")
