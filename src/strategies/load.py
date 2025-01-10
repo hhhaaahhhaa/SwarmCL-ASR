@@ -20,7 +20,7 @@ MERGING = {
 CONTINUAL = {
     "seq-linear": (f"{SRC_DIR}/seq_linear.py", "SeqLinearStrategy"),
     # "seq-ties": (f"{SRC_DIR}/swarm_cl/strategy.py", "SwarmCLStrategy"),
-    "seq-swarm": (f"{SRC_DIR}/swarm_cl/strategy.py", "SwarmCLStrategy"),
+    "seq-swarm": (f"{SRC_DIR}/seq_swarm.py", "SeqSwarmStrategy"),
 }
 
 STRATEGY_MAPPING = {

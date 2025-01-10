@@ -106,7 +106,7 @@ class CVSequence(Task):
     def get_buffer(self, tid: int):
         if tid == 0:
             return self._datasets[0]
-        return ConcatDataset(self._datasets[:tid])
+        return ConcatDataset(self._datasets[:tid+1])
 
     def train_dataset(self) -> Dataset:
         raise NotImplementedError
