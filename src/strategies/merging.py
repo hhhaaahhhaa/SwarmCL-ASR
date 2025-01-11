@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 from tqdm import tqdm
 import copy
@@ -85,13 +86,23 @@ class GreedySoup(IStrategy):
         self.config = config
 
         self.info = load_exp0_results()
+        load_system(
+            system_name=self.config["strategy_config"]["system_name"],
+            system_config=copy.deepcopy(self.config["system_config"])
+        )
+        self.info["particles"].append(
+            system2particle(load_system(
+                system_name=self.config["strategy_config"]["system_name"],
+                system_config=copy.deepcopy(self.config["system_config"])
+            ))
+        )
 
     def eval_particle(self, particle: ModelParticle, ds) -> float:
         system = particle2system(particle, ref_system=self.info["ref_system"])
         system.eval()
         system.cuda()
         gt, predictions = [], []
-        for sample in tqdm(ds):
+        for sample in ds:
             predictions.extend(system.inference([sample["wav"]]))
             gt.append(sample["text"])
         word_error_rate = wer(gt, predictions)
@@ -99,17 +110,17 @@ class GreedySoup(IStrategy):
     
     def run(self, data_obj):
         task_name, data_obj = data_obj
-        assert task_name in ["cv-val100"]
+        assert task_name in ["cv-seq", "cv-seq-500"]
+        data_obj = data_obj.get_buffer(-1)
+        record = {}
         utilities = [self.eval_particle(particle, data_obj) for particle in self.info["particles"]]
+        record["Sorted indices"] = np.argsort(np.array(utilities)).tolist()
         p_and_u = sorted(list(zip(self.info["particles"], utilities)), key=lambda x: x[1], reverse=True)
         
         soup = [p_and_u[0][0]]
         global_best = p_and_u[0]
-        record = {"soup_idx": [0], "utility": [global_best[1]]}
-        self.log(f"Iteration 1:")
-        self.log(f"Soup indices: {record['soup_idx']}.")
-        self.log(f"Global best: {global_best[1]}.")
-        for i in range(1, len(p_and_u)):
+        record.update({"soup_idx": [0], "utility": [global_best[1]]})
+        for i in tqdm(range(1, len(p_and_u))):
             merged_particle = linear_combination([1.0 / (len(soup) + 1)] * (len(soup) + 1), [*soup, p_and_u[i][0]])
             u = self.eval_particle(merged_particle, data_obj)  # currently depend on cls(data_obj)
             if u > global_best[1]:
@@ -117,9 +128,8 @@ class GreedySoup(IStrategy):
                 record["soup_idx"].append(i)
                 global_best = (merged_particle, u)
             record["utility"].append(global_best[1])
-            self.log(f"Iteration {i+1}:")
-            self.log(f"Soup indices: {record['soup_idx']}.")
-            self.log(f"Global best: {global_best[1]}.")
+        self.log(f"Soup indices: {record['soup_idx']}.")
+        self.log(f"Global best: {global_best[1]}.")
         merged_system = particle2system(global_best[0], ref_system=self.info["ref_system"])
         merged_system.save(f"{self.config['output_dir']['ckpt_dir']}/merged.ckpt")
         with open(f"{self.config['output_dir']['log_dir']}/record.json", "w") as f:
@@ -148,7 +158,8 @@ class ModelSwarm(IStrategy):
     
     def run(self, data_obj):
         task_name, data_obj = data_obj
-        assert task_name in ["cv-val100"]
+        assert task_name in ["cv-seq", "cv-seq-500"]
+        data_obj = data_obj.get_buffer(-1)
         swarm_config = copy.deepcopy(self.config["strategy_config"]["swarm"])
         swarm_config["cache_dir"] = f"{self.config['output_dir']['log_dir']}/cache"
         swarm_executor = SwarmExecutor(

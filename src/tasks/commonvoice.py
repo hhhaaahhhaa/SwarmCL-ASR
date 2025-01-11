@@ -94,9 +94,9 @@ class Val100Task(Task):
 
 class CVSequence(Task):
     """ This is only an object. """
-    def __init__(self) -> None:
-        accents = ["eng", "aus", "ind", "sco", "ire"]
-        indices = list(range(20))
+    def __init__(self, n_samples_per_task=20) -> None:
+        accents = ["aus", "eng", "ind", "ire", "sco"]
+        indices = list(range(n_samples_per_task))
         self._datasets = [
             Subset(StandardDataset(root=f"_cache/CommonVoice-accent-full/{accent}/dev"), indices=indices)
         for accent in accents]
@@ -104,9 +104,12 @@ class CVSequence(Task):
         self.task_names = [f"cv-{x}" for x in accents]
 
     def get_buffer(self, tid: int):
-        if tid == 0:
+        if tid == -1:
+            return ConcatDataset(self._datasets)
+        elif tid == 0:
             return self._datasets[0]
-        return ConcatDataset(self._datasets[:tid+1])
+        else:
+            return ConcatDataset(self._datasets[:tid+1])
 
     def train_dataset(self) -> Dataset:
         raise NotImplementedError
@@ -116,3 +119,13 @@ class CVSequence(Task):
     
     def test_dataset(self) -> Dataset:
         raise NotImplementedError
+
+
+class CVSequence100(Task):
+    def __new__(cls):
+        return CVSequence(n_samples_per_task=20)
+
+
+class CVSequence500(Task):
+    def __new__(cls):
+        return CVSequence(n_samples_per_task=100)

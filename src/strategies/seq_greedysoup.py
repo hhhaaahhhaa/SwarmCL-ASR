@@ -1,5 +1,5 @@
-
 import os
+import numpy as np
 import copy
 import yaml
 import json
@@ -101,22 +101,21 @@ class SeqGreedySoupStrategy(IStrategy):
 
     def run(self, data_obj):
         task_name, data_obj = data_obj
-        assert task_name in ["cv-seq"]
+        assert task_name in ["cv-seq", "cv-seq-500"]
         for tid, task_name in enumerate(data_obj.task_names):
             self._finetune(tid, task_name)
 
             # merge
+            record = {}
             particles = self._load_particles(tid)
             valset = data_obj.get_buffer(tid)
             utilities = [self._eval_particle(particle, valset) for particle in particles]
+            record["Sorted indices"] = np.argsort(np.array(utilities)).tolist()
             p_and_u = sorted(list(zip(particles, utilities)), key=lambda x: x[1], reverse=True)
             
             soup = [p_and_u[0][0]]
             global_best = p_and_u[0]
-            record = {"soup_idx": [0], "utility": [global_best[1]]}
-            self.log(f"Iteration 1:")
-            self.log(f"Soup indices: {record['soup_idx']}.")
-            self.log(f"Global best: {global_best[1]}.")
+            record.update({"soup_idx": [0], "utility": [global_best[1]]})
             for i in tqdm(range(1, len(p_and_u))):
                 merged_particle = linear_combination([1.0 / (len(soup) + 1)] * (len(soup) + 1), [*soup, p_and_u[i][0]])
                 u = self._eval_particle(merged_particle, valset)
@@ -125,6 +124,7 @@ class SeqGreedySoupStrategy(IStrategy):
                     record["soup_idx"].append(i)
                     global_best = (merged_particle, u)
                 record["utility"].append(global_best[1])
+            self.log(f"Soup indices: {record['soup_idx']}.")
             self.log(f"Global best: {global_best[1]}.")
             with open(f"{self._get_exp_root(tid)}/record.json", "w") as f:
                 json.dump(record, f, indent=4)

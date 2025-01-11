@@ -16,8 +16,8 @@ def get_data_obj(task_name: str):
         return (task_name, None)
     elif task_name == "cv-val100":
         return (task_name, get_task("cv-val100")._dataset)
-    elif task_name == "cv-seq":
-        return (task_name, get_task("cv-seq"))
+    elif task_name in ["cv-seq", "cv-seq-500"]:
+        return (task_name, get_task(task_name))
     else:
         raise NotImplementedError
 
@@ -28,7 +28,7 @@ def create_config(args):
         "strategy_name": args.strategy_name,
         "task_name": args.task_name,
     }
-    res["strategy_config"] = {}
+    res["strategy_config"] = {"system_name": args.system_name}
     for path in args.config:
         strategy_config = yaml.load(open(path, "r"), Loader=yaml.FullLoader)
         res["strategy_config"].update(strategy_config)
@@ -74,6 +74,7 @@ if __name__ == "__main__":
     parser.add_argument('-t', '--task_name', type=str, help="task identifier")  # note that this is a meta data object
     parser.add_argument('-n', '--exp_name', type=str, default="unnamed_strategy")
     parser.add_argument('--config', nargs='+', default=[])
+    parser.add_argument('--system_name', type=str, default="wav2vec2")
     parser.add_argument('--system_config', nargs='+', default=["config/system/base.yaml"])
     parser.add_argument('--run10', action="store_true", default=False)
 
