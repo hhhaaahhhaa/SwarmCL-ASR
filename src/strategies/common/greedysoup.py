@@ -30,7 +30,7 @@ class GreedySoupExecutor(Generic[T]):
     def _init_search(self, particles: list[T], record={}) -> list[tuple[T, float]]:
         self.log("Initialization...")
         utilities = [self.utility_function(particle) for particle in particles]
-        record["sort_idx"] = np.argsort(np.array(utilities)).tolist().reverse()
+        record["sort_idx"] = np.argsort(np.array(utilities)).tolist()[::-1]
         p_and_u = sorted(list(zip(particles, utilities)), key=lambda x: x[1], reverse=True)
         return p_and_u
     
