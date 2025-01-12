@@ -60,7 +60,7 @@ class SeqGreedySoupStrategy(IStrategy):
         with open(f"{exp_root}/config.yaml", "w", encoding="utf-8") as f:
             yaml.dump(task_config, f, sort_keys=False)
         
-        train_one_task(task_config, loader="torch", debug=True)
+        train_one_task(task_config, loader="torch")
 
     def _eval_particle(self, particle: ModelParticle, ds) -> float:
         if getattr(self, "ref_system_for_eval", None) is None:
