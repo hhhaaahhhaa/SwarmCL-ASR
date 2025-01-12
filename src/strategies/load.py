@@ -28,6 +28,7 @@ CONTINUAL = {
 EXP = {
     "cgreedysoup": (f"{SRC_DIR}/seq_greedysoup.py", "CGreedySoupStrategy"),
     "cswarm": (f"{SRC_DIR}/seq_swarm.py", "CSwarmStrategy"),
+    "cdoublesoup": (f"{SRC_DIR}/seq_greedysoup.py", "CDoubleSoupStrategy"),
 }
 
 STRATEGY_MAPPING = {

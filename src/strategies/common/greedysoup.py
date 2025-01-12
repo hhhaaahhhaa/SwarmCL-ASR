@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from typing import Type, TypeVar, Generic, Callable
 from tqdm import tqdm
@@ -52,6 +53,7 @@ class GreedySoupExecutor(Generic[T]):
         self.log(f"Soup indices: {record['soup_idx']}.")
         self.log(f"Global best: {global_best[1]}.")
 
+        os.makedirs(self.config['cache_dir'], exist_ok=True)
         with open(f"{self.config['cache_dir']}/record.json", "w") as f:
             json.dump(record, f, indent=4)
         

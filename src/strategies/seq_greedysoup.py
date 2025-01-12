@@ -107,7 +107,7 @@ class SeqGreedySoupStrategy(IStrategy):
             soup_config,
             cls_type=ModelParticle,
             linear_operator=linear_combination,
-            utility_function=partial(self._eval_particle, ds=data_obj.get_buffer(tid))  # currently depend on cls(data_obj)
+            utility_function=partial(self._eval_particle, ds=data_obj.get_buffer(tid))
         )
 
         particles = self._load_particles(tid)
@@ -142,3 +142,66 @@ class CGreedySoupStrategy(SeqGreedySoupStrategy):
                 res.append(system2particle(self._get_initial_system()))
                 break  # ensure breaking the while loop
         return res
+
+
+class CDoubleSoupStrategy(SeqGreedySoupStrategy):
+    def _get_merged_path(self, tid: int):
+        return f"{self.config['output_dir']['ckpt_dir']}/tid={tid+1}-merged.ckpt"
+    
+    def _get_merged_system(self, tid: int):
+        return load_system(
+            system_name=self.config["strategy_config"]["system_name"],
+            system_config=copy.deepcopy(self.config["system_config"]),
+            checkpoint=self._get_merged_path(tid),
+            loader="torch"
+        )
+    
+    def _load_particles(self, tid: int, mode="ft") -> list[ModelParticle]:
+        # determine checkpoints that will participate
+        include_last_k = 2e9  # include all
+        
+        res = []
+        tmp = tid
+        while 1:
+            if tmp >= 0:
+                if mode == "merged":  # please be CAREFUL to call this only after merged checkpoint is generated
+                    res.append(system2particle(self._get_merged_system(tmp)))
+                    if len(res) == include_last_k:
+                        break
+                if mode == "ft":
+                    res.append(system2particle(self._get_ft_system(tmp)))
+                    if len(res) == include_last_k:
+                        break
+                tmp -= 1
+            else:  # the last iteration, add pretrained checkpoint
+                res.append(system2particle(self._get_initial_system()))
+                break  # ensure breaking the while loop
+        return res
+
+    def _integrate(self, tid, data_obj):
+        ds = data_obj.get_buffer(tid)
+        soup_config = {"cache_dir": f"{self._get_exp_root(tid)}/1st-merge"}
+        executor = GreedySoupExecutor(
+            soup_config,
+            cls_type=ModelParticle,
+            linear_operator=linear_combination,
+            utility_function=partial(self._eval_particle, ds=ds)
+        )
+
+        particles = self._load_particles(tid, mode="ft")
+        merged_particle = executor.run(particles)
+        merged_system = particle2system(merged_particle, ref_system=self._get_initial_system())
+        merged_system.save(self._get_merged_path(tid))
+
+        soup_config = {"cache_dir": f"{self._get_exp_root(tid)}/2nd-merge"}
+        executor = GreedySoupExecutor(
+            soup_config,
+            cls_type=ModelParticle,
+            linear_operator=linear_combination,
+            utility_function=partial(self._eval_particle, ds=ds)
+        )
+
+        particles = self._load_particles(tid, mode="merged")
+        double_merged_particle = executor.run(particles)
+        double_merged_system = particle2system(double_merged_particle, ref_system=self._get_initial_system())
+        double_merged_system.save(self._get_checkpoint_path(tid))
