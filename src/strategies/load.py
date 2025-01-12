@@ -25,10 +25,15 @@ CONTINUAL = {
     "seq-swarm": (f"{SRC_DIR}/seq_swarm.py", "SeqSwarmStrategy"),
 }
 
+EXP = {
+    "cgreedysoup": (f"{SRC_DIR}/seq_greedysoup.py", "CGreedySoupStrategy"),
+}
+
 STRATEGY_MAPPING = {
     **BASIC,
     **MERGING,
     **CONTINUAL,
+    **EXP,
 }
 
 

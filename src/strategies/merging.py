@@ -10,6 +10,7 @@ from one import load_system
 from src.systems.load import get_system_cls
 from src.strategies.base import IStrategy
 from src.utils.tool import wer
+from .common.greedysoup import GreedySoupExecutor
 from .common.swarm import SwarmExecutor
 from .common import merging
 from .swarm_cl.particle import ModelParticle, linear_combination, system2particle, particle2system
@@ -112,28 +113,17 @@ class GreedySoup(IStrategy):
         task_name, data_obj = data_obj
         assert task_name in ["cv-seq", "cv-seq-500"]
         data_obj = data_obj.get_buffer(-1)
-        record = {}
-        utilities = [self.eval_particle(particle, data_obj) for particle in self.info["particles"]]
-        record["Sorted indices"] = np.argsort(np.array(utilities)).tolist()
-        p_and_u = sorted(list(zip(self.info["particles"], utilities)), key=lambda x: x[1], reverse=True)
-        
-        soup = [p_and_u[0][0]]
-        global_best = p_and_u[0]
-        record.update({"soup_idx": [0], "utility": [global_best[1]]})
-        for i in tqdm(range(1, len(p_and_u))):
-            merged_particle = linear_combination([1.0 / (len(soup) + 1)] * (len(soup) + 1), [*soup, p_and_u[i][0]])
-            u = self.eval_particle(merged_particle, data_obj)  # currently depend on cls(data_obj)
-            if u > global_best[1]:
-                soup.append(p_and_u[i][0])
-                record["soup_idx"].append(i)
-                global_best = (merged_particle, u)
-            record["utility"].append(global_best[1])
-        self.log(f"Soup indices: {record['soup_idx']}.")
-        self.log(f"Global best: {global_best[1]}.")
-        merged_system = particle2system(global_best[0], ref_system=self.info["ref_system"])
+
+        soup_config = {"cache_dir": self.config['output_dir']['log_dir']}
+        executor = GreedySoupExecutor(
+            soup_config,
+            cls_type=ModelParticle,
+            linear_operator=linear_combination,
+            utility_function=partial(self.eval_particle, ds=data_obj)  # currently depend on cls(data_obj)
+        )
+        merged_particle = executor.run(self.info["particles"])
+        merged_system = particle2system(merged_particle, ref_system=self.info["ref_system"])
         merged_system.save(f"{self.config['output_dir']['ckpt_dir']}/merged.ckpt")
-        with open(f"{self.config['output_dir']['log_dir']}/record.json", "w") as f:
-            json.dump(record, f, indent=4)
 
     def log(self, x):
         print(f"[GreedySoup]: {x}")

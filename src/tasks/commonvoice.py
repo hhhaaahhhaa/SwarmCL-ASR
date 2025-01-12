@@ -95,7 +95,7 @@ class Val100Task(Task):
 class CVSequence(Task):
     """ This is only an object. """
     def __init__(self, n_samples_per_task=20) -> None:
-        accents = ["aus", "eng", "ind", "ire", "sco"]
+        accents = ["eng", "aus", "ind", "sco", "ire"]
         indices = list(range(n_samples_per_task))
         self._datasets = [
             Subset(StandardDataset(root=f"_cache/CommonVoice-accent-full/{accent}/dev"), indices=indices)

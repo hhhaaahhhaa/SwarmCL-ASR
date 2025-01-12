@@ -1,13 +1,12 @@
 import os
-import numpy as np
 import copy
 import yaml
-import json
-from tqdm import tqdm
+from functools import partial
 
 from one import train_one_task, load_system
 from src.strategies.base import IStrategy
 from src.utils.tool import wer
+from .common.greedysoup import GreedySoupExecutor
 from .swarm_cl.particle import ModelParticle, linear_combination, system2particle, particle2system
 
 
@@ -61,7 +60,7 @@ class SeqGreedySoupStrategy(IStrategy):
         with open(f"{exp_root}/config.yaml", "w", encoding="utf-8") as f:
             yaml.dump(task_config, f, sort_keys=False)
         
-        train_one_task(task_config, loader="torch")
+        train_one_task(task_config, loader="torch", debug=True)
 
     def _eval_particle(self, particle: ModelParticle, ds) -> float:
         if getattr(self, "ref_system_for_eval", None) is None:
@@ -77,7 +76,7 @@ class SeqGreedySoupStrategy(IStrategy):
         return -word_error_rate
     
     def _load_particles(self, tid: int) -> list[ModelParticle]:
-        # determine checkpoints that will participate in model swarm
+        # determine checkpoints that will participate
         include_last_k = self.config["strategy_config"]["include_last_k"]
         if include_last_k == -1:  # include all
             include_last_k = 2e9
@@ -99,37 +98,47 @@ class SeqGreedySoupStrategy(IStrategy):
                 break  # ensure breaking the while loop
         return res
 
+    def _load_start(self, tid, data_obj):
+        pass
+
+    def _integrate(self, tid, data_obj):
+        soup_config = {"cache_dir": self._get_exp_root(tid)}
+        executor = GreedySoupExecutor(
+            soup_config,
+            cls_type=ModelParticle,
+            linear_operator=linear_combination,
+            utility_function=partial(self._eval_particle, ds=data_obj.get_buffer(tid))  # currently depend on cls(data_obj)
+        )
+
+        particles = self._load_particles(tid)
+        merged_particle = executor.run(particles)
+        merged_system = particle2system(merged_particle, ref_system=self._get_initial_system())
+        merged_system.save(self._get_checkpoint_path(tid))
+
     def run(self, data_obj):
         task_name, data_obj = data_obj
         assert task_name in ["cv-seq", "cv-seq-500"]
         for tid, task_name in enumerate(data_obj.task_names):
+            # start
+            self._load_start(tid, data_obj)
             self._finetune(tid, task_name)
+            self._integrate(tid, data_obj)
 
-            # merge
-            record = {}
-            particles = self._load_particles(tid)
-            valset = data_obj.get_buffer(tid)
-            utilities = [self._eval_particle(particle, valset) for particle in particles]
-            record["Sorted indices"] = np.argsort(np.array(utilities)).tolist()
-            p_and_u = sorted(list(zip(particles, utilities)), key=lambda x: x[1], reverse=True)
-            
-            soup = [p_and_u[0][0]]
-            global_best = p_and_u[0]
-            record.update({"soup_idx": [0], "utility": [global_best[1]]})
-            for i in tqdm(range(1, len(p_and_u))):
-                merged_particle = linear_combination([1.0 / (len(soup) + 1)] * (len(soup) + 1), [*soup, p_and_u[i][0]])
-                u = self._eval_particle(merged_particle, valset)
-                if u > global_best[1]:
-                    soup.append(p_and_u[i][0])
-                    record["soup_idx"].append(i)
-                    global_best = (merged_particle, u)
-                record["utility"].append(global_best[1])
-            self.log(f"Soup indices: {record['soup_idx']}.")
-            self.log(f"Global best: {global_best[1]}.")
-            with open(f"{self._get_exp_root(tid)}/record.json", "w") as f:
-                json.dump(record, f, indent=4)
-            merged_system = particle2system(global_best[0], ref_system=self._get_initial_system())
-            merged_system.save(self._get_checkpoint_path(tid))
 
-    def log(self, x):
-        print(f"[Sequential GreedySoup]: {x}")
+class CGreedySoupStrategy(SeqGreedySoupStrategy):
+    def _load_particles(self, tid: int) -> list[ModelParticle]:
+        # determine checkpoints that will participate
+        include_last_k = 2e9  # include all
+        
+        res = []
+        tmp = tid
+        while 1:
+            if tmp >= 0:
+                res.append(system2particle(self._get_ft_system(tmp)))
+                if len(res) == include_last_k:
+                    break
+                tmp -= 1
+            else:  # the last iteration, add pretrained checkpoint
+                res.append(system2particle(self._get_initial_system()))
+                break  # ensure breaking the while loop
+        return res
