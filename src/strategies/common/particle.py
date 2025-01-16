@@ -4,7 +4,7 @@ import pickle
 
 from src.systems.base import System
 from src.systems.wav2vec2 import Wav2vec2System
-from ..common.interface import IParticle
+from .interface import IParticle
 
 
 class ModelParticle(IParticle):

@@ -4,7 +4,7 @@ import yaml
 
 from one import train_one_task, load_system
 from src.strategies.base import IStrategy
-from .swarm_cl.particle import linear_combination, system2particle, particle2system
+from .common.particle import linear_combination, system2particle, particle2system
 
 
 class SeqLinearStrategy(IStrategy):

@@ -13,27 +13,8 @@ from src.utils.tool import wer
 from .common.greedysoup import GreedySoupExecutor
 from .common.swarm import SwarmExecutor
 from .common import merging
-from .swarm_cl.particle import ModelParticle, linear_combination, system2particle, particle2system
-
-
-def load_exp0_results():
-    res = {}
-    particles = []
-    for accent in ["aus", "eng", "ind", "ire", "sco"]:
-        ckpt_path = f"results/exp0/{accent}/ckpt/best.ckpt"
-        config = yaml.load(open(f"results/exp0/{accent}/config.yaml", "r"), Loader=yaml.FullLoader)
-        system_cls = get_system_cls(config["system_name"])
-        system = system_cls.load_from_checkpoint(ckpt_path)
-        particles.append(system2particle(system))
-        # print(len(particles[-1].get_data().keys()))
-    res["particles"] = particles
-
-    # load pretrained system used in exp0
-    res["ref_system"] = load_system(
-        system_name="wav2vec2",
-        system_config=yaml.load(open("config/system/base.yaml", "r"), Loader=yaml.FullLoader)
-    )
-    return res
+from .common.particle import ModelParticle, linear_combination, system2particle, particle2system
+from .common.utils import load_exp0_results, load_cl_results
 
 
 class UniformSoup(IStrategy):
@@ -86,20 +67,20 @@ class GreedySoup(IStrategy):
     def __init__(self, config) -> None:
         self.config = config
 
-        self.info = load_exp0_results()
-        load_system(
+        # self.info = load_exp0_results()
+        self.info = load_cl_results("results/exp1/seq-ft")
+        self.info["particles"].append(system2particle(self._get_initial_system()))
+
+    def _get_initial_system(self):
+        return load_system(
             system_name=self.config["strategy_config"]["system_name"],
             system_config=copy.deepcopy(self.config["system_config"])
         )
-        self.info["particles"].append(
-            system2particle(load_system(
-                system_name=self.config["strategy_config"]["system_name"],
-                system_config=copy.deepcopy(self.config["system_config"])
-            ))
-        )
 
     def eval_particle(self, particle: ModelParticle, ds) -> float:
-        system = particle2system(particle, ref_system=self.info["ref_system"])
+        if getattr(self, "ref_system_for_eval", None) is None:
+            self.ref_system_for_eval = self._get_initial_system()
+        system = particle2system(particle, ref_system=self.ref_system_for_eval)
         system.eval()
         system.cuda()
         gt, predictions = [], []
@@ -122,7 +103,7 @@ class GreedySoup(IStrategy):
             utility_function=partial(self.eval_particle, ds=data_obj)  # currently depend on cls(data_obj)
         )
         merged_particle = executor.run(self.info["particles"])
-        merged_system = particle2system(merged_particle, ref_system=self.info["ref_system"])
+        merged_system = particle2system(merged_particle, ref_system=self._get_initial_system())
         merged_system.save(f"{self.config['output_dir']['ckpt_dir']}/merged.ckpt")
 
     def log(self, x):

@@ -7,7 +7,7 @@ from one import train_one_task, load_system
 from src.strategies.base import IStrategy
 from src.utils.tool import wer
 from .common.greedysoup import GreedySoupExecutor
-from .swarm_cl.particle import ModelParticle, linear_combination, system2particle, particle2system
+from .common.particle import ModelParticle, linear_combination, system2particle, particle2system
 
 
 class SeqGreedySoupStrategy(IStrategy):
