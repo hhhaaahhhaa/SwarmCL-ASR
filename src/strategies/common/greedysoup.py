@@ -20,12 +20,14 @@ class GreedySoupExecutor(Generic[T]):
         config: dict,
         cls_type: Type[T],
         linear_operator: Callable[[list[float], list[T]], T],
-        utility_function: Callable[[T], float]
+        utility_function: Callable[[T], float],
+        verbose=True
     ) -> None:
         self.config = config
         self.cls_type = cls_type
         self.linear_operator = linear_operator
         self.utility_function = utility_function
+        self.verbose = verbose
 
     def _init_search(self, particles: list[T], record={}) -> list[tuple[T, float]]:
         self.log("Initialization...")
@@ -34,7 +36,7 @@ class GreedySoupExecutor(Generic[T]):
         p_and_u = sorted(list(zip(particles, utilities)), key=lambda x: x[1], reverse=True)
         return p_and_u
     
-    def run(self, particles: list[T]) -> T:
+    def run(self, particles: list[T], return_record=False) -> T:
         record = {}
         p_and_u = self._init_search(particles, record)
 
@@ -57,7 +59,10 @@ class GreedySoupExecutor(Generic[T]):
         with open(f"{self.config['cache_dir']}/record.json", "w") as f:
             json.dump(record, f, indent=4)
         
+        if return_record:
+            return global_best[0], record
         return global_best[0]
     
     def log(self, x):
-        print(f"[GreedySoup]: {x}")
+        if self.verbose:
+            print(f"[GreedySoup]: {x}")

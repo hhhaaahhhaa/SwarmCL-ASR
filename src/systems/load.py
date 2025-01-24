@@ -10,8 +10,13 @@ BASIC = {
     "wav2vec2": (f"{SRC_DIR}/wav2vec2.py", "Wav2vec2System"),
 }
 
+GROUP = {
+    "wav2vec2-group": (f"{SRC_DIR}/group.py", "Wav2vec2Group"),  # does not inherit System...
+}
+
 SYSTEM_MAPPING = {
     **BASIC,
+    **GROUP,
 }
 
 

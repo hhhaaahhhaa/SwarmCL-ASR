@@ -17,7 +17,8 @@ class Task(object):
     
 
 class StandardDataset(Dataset):
-    def __init__(self, root: str) -> None:
+    def __init__(self, root: str, name: str=None) -> None:
+        self.name = name
         self.corpus = StandardCorpus(root=root)
         self.idx_seq = list(range(len(self.corpus)))
 

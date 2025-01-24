@@ -236,7 +236,7 @@ class Wav2vec2System(System):
 
     # inference
     @torch.no_grad()
-    def inference(self, wavs):
+    def inference(self, wavs, *args, **kwargs):
         inputs = self._wav_to_model_input(wavs)
         outputs = self.model(**inputs).logits
         predicted_ids = torch.argmax(outputs, dim=-1)

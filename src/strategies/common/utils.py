@@ -10,7 +10,7 @@ from .particle import ModelParticle, system2particle
 def load_exp0_results():
     res = {}
     particles = []
-    for accent in ["aus", "eng", "ind", "ire", "sco"]:
+    for accent in ["eng", "aus", "ind", "sco", "ire"]:
         ckpt_path = f"results/exp0/{accent}/ckpt/best.ckpt"
         config = yaml.load(open(f"results/exp0/{accent}/config.yaml", "r"), Loader=yaml.FullLoader)
         system_cls = get_system_cls(config["system_name"])

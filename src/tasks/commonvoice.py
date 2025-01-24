@@ -1,6 +1,7 @@
 from torch.utils.data import Dataset, ConcatDataset, Subset
 
 from .base import Task, StandardDataset
+from .utils import MultiTaskSequence
 
 
 class CVAccentTask(Task):
@@ -51,17 +52,16 @@ class USTask(Task):
 
 class AllTask(Task):
     def __init__(self) -> None:
-        accents = ["aus", "eng", "ind", "ire", "sco"]
-        self._train_dataset = ConcatDataset([
-            StandardDataset(root=f"_cache/CommonVoice-accent-full/{accent}/train")
+        accents = ["eng", "aus", "ind", "sco", "ire"]
+        self._train_dataset = MultiTaskSequence([
+            StandardDataset(root=f"_cache/CommonVoice-accent-full/{accent}/train", name=f"cv-{accent}")
         for accent in accents])
-        self._val_dataset = ConcatDataset([
-            StandardDataset(root=f"_cache/CommonVoice-accent-full/{accent}/dev")
+        self._val_dataset = MultiTaskSequence([
+            StandardDataset(root=f"_cache/CommonVoice-accent-full/{accent}/dev", name=f"cv-{accent}")
         for accent in accents])
-        self._test_dataset = ConcatDataset([
-            StandardDataset(root=f"_cache/CommonVoice-accent-full/{accent}/test")
+        self._test_dataset = MultiTaskSequence([
+            StandardDataset(root=f"_cache/CommonVoice-accent-full/{accent}/test", name=f"cv-{accent}")
         for accent in accents])
-
     def train_dataset(self) -> Dataset:
         return self._train_dataset
 
@@ -104,6 +104,8 @@ class CVSequence(Task):
         self.task_names = [f"cv-{x}" for x in accents]
 
     def get_buffer(self, tid: int):
+        if isinstance(tid, list):
+            return ConcatDataset([self._datasets[x] for x in tid])
         if tid == -1:
             return ConcatDataset(self._datasets)
         elif tid == 0:

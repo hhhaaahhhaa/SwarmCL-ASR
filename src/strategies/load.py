@@ -29,6 +29,9 @@ EXP = {
     "cgreedysoup": (f"{SRC_DIR}/seq_greedysoup.py", "CGreedySoupStrategy"),
     "cswarm": (f"{SRC_DIR}/seq_swarm.py", "CSwarmStrategy"),
     "cdoublesoup": (f"{SRC_DIR}/seq_greedysoup.py", "CDoubleSoupStrategy"),
+    "gcgreedysoup": (f"{SRC_DIR}/cmerging.py", "GeneralCGreedySoup"),
+    "gcuniformsoup": (f"{SRC_DIR}/cmerging.py", "GeneralCUniformSoup"),
+    "mmodel": (f"{SRC_DIR}/cmerging.py", "MultiModelStrategy"),
 }
 
 STRATEGY_MAPPING = {

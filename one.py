@@ -67,16 +67,6 @@ def train_one_task(config: dict, loader="torch", debug: bool=False):
         checkpoint=config.get("checkpoint", None),
         loader=loader
     )
-    # system_cls = get_system_cls(config["system_name"])
-    # if config.get("checkpoint", None) is not None:
-    #     try:
-    #         print(f'Load from {config["checkpoint"]}...')
-    #         system = system_cls.load_from_checkpoint(config["checkpoint"], config=system_config)  # ONLY load weights and overwrite config
-    #     except:
-    #         print(f'System {config["system_name"]} fails/unsupports checkpoint loading.')
-    #         exit()
-    # else:
-    #     system = system_cls(system_config)
     if debug:
         print("System module prepared.")
         input()

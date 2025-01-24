@@ -10,6 +10,8 @@ from one import load_system
 
 
 def run_single_task(system, output_dir: str, tname: str):
+    output_dir = f"results/benchmark/{output_dir}"
+    os.makedirs(output_dir, exist_ok=True)
     system.eval()
     system.cuda()
 
@@ -25,7 +27,7 @@ def run_single_task(system, output_dir: str, tname: str):
             long_cnt += 1
             continue
         n_words.append(len(sample["text"].split(" ")))
-        trans = system.inference([sample["wav"]])
+        trans = system.inference([sample["wav"]], tid=sample.get("tid", None))
         err = wer(sample["text"], trans[0])
         errs.append(err)
         transcriptions.append((sample["text"], trans[0]))
@@ -38,14 +40,6 @@ def run_single_task(system, output_dir: str, tname: str):
         "basenames": basenames,
     }
     log_results(results, f"{output_dir}/{tname}")
-
-
-def run_eval(system, output_dir: str):
-    os.makedirs(output_dir, exist_ok=True)
-    accents = ["aus", "eng", "ind", "ire", "sco"]
-    for accent in (accents):
-        run_single_task(system, output_dir, tname=f"cv-{accent}")
-    run_single_task(system, output_dir, tname="cv-all")
 
 
 def calc_wer(results: dict) -> float:
@@ -76,14 +70,15 @@ def log_results(results, output_dir: str):
 
 
 def main(args):
-    output_dir = f"results/benchmark/{args.output_dir}"
     if args.loader == "torch":
         system_config = {}
         for path in args.config:
             config = yaml.load(open(path, "r"), Loader=yaml.FullLoader)
             system_config.update(config)
-    else:
+    elif args.loader == "lightning":
         system_config = None
+    else:
+        raise NotImplementedError
     system = load_system(
         system_name=args.system_name,
         system_config=system_config,
@@ -92,11 +87,15 @@ def main(args):
     )
 
     print("========================== Start! ==========================")
-    print("Output Dir: ", output_dir)
+    print(f"Output Dir: results/benchmark/{args.output_dir}")
     print("System name: ", args.system_name)
     print("Checkpoint Path: ", args.checkpoint)
 
-    run_eval(system, output_dir=output_dir)
+    # run 5 accent tasks
+    # accents = ["aus", "eng", "ind", "ire", "sco"]
+    # for accent in (accents):
+    #     run_single_task(system, args.output_dir, tname=f"cv-{accent}")
+    run_single_task(system, args.output_dir, tname="cv-all")
 
 
 if __name__ == "__main__":
@@ -105,7 +104,7 @@ if __name__ == "__main__":
     parser.add_argument('-s', '--system_name', type=str, help="system identifier")
     parser.add_argument('-c', '--checkpoint', type=str, default=None)
     parser.add_argument('--config', nargs='+', default=["config/system/base.yaml"])
-    parser.add_argument("--loader", type=str, default="torch")
+    parser.add_argument("--loader", type=str, default="torch", help="torch or lightning")
 
     args = parser.parse_args()
     main(args)
