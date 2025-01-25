@@ -3,7 +3,7 @@ import hashlib
 import random
 
 from .base import Task, StandardDataset
-from .apply_noise import apply_noise_on_dataset
+from .apply_noise import add_noise
 
 
 class LibriSpeechTask(Task):
@@ -34,18 +34,40 @@ def get_seed_from_string_and_int(input_string, input_int):
     return seed
 
 
+class NoiseWrapper(Dataset):
+    def __init__(self, ds: Dataset, noise_type: str, snr_level=10, name: str=None):
+        self.obj = ds
+        self.noise_type = noise_type
+        self.snr_level = snr_level
+        self.name = name
+    
+    def __getitem__(self, index):
+        res = self.obj.__getitem__(index)
+        res["wav"] = add_noise(res["wav"], noise_type=self.noise_type, snr_level=self.snr_level)
+        return res
+    
+    def __len__(self):
+        return len(self.obj)
+
+
 class LibriSpeechNoiseTask(Task):
     def __init__(self, noise_type: str, snr_level=10, n_samples=5000) -> None:
         self.full = LibriSpeechTask()
         seed = get_seed_from_string_and_int(noise_type, snr_level)
         random.seed(seed)
         indices = random.sample(range(len(self.full._train_dataset)), n_samples)
-        self._train_dataset = Subset(self.full._train_dataset, indices=indices)
-        self._val_dataset = Subset(self.full._val_dataset, indices=list(range(1000)))
-        self._test_dataset = Subset(self.full._test_dataset, indices=list(range(1000)))
-        apply_noise_on_dataset(self._train_dataset, noise_type, snr_level)
-        apply_noise_on_dataset(self._val_dataset, noise_type, snr_level)
-        apply_noise_on_dataset(self._test_dataset, noise_type, snr_level)
+        self._train_dataset = NoiseWrapper(
+            Subset(self.full._train_dataset, indices=indices),
+            noise_type, snr_level, name=f"LS_{noise_type}_{snr_level}"
+        )
+        self._val_dataset = NoiseWrapper(
+            Subset(self.full._val_dataset, indices=list(range(1000))),
+            noise_type, snr_level, name=f"LS_{noise_type}_{snr_level}"
+        )
+        self._test_dataset = NoiseWrapper(
+            Subset(self.full._test_dataset, indices=list(range(1000))),
+            noise_type, snr_level, name=f"LS_{noise_type}_{snr_level}"
+        )
 
     def train_dataset(self) -> Dataset:
         return self._train_dataset

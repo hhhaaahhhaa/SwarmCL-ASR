@@ -61,11 +61,3 @@ def add_noise(clean_wav, noise_type, snr_level):
         noise = noise[0:len(clean_wav)]
 
     return snr_mixer(clean_wav, noise, snr=snr_level)
-
-
-def apply_noise_on_dataset(ds: Dataset, noise_type: str, snr_level: int) -> None:
-    """ in-place wrap dataset.__getitem__() """
-    def f_new(idx):
-        res = ds.__getitem__(idx)
-        res["wav"] = add_noise(res["wav"], noise_type=noise_type, snr_level=snr_level)
-    setattr(ds, "__getitem__", f_new)

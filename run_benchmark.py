@@ -91,17 +91,15 @@ def main(args):
     print("System name: ", args.system_name)
     print("Checkpoint Path: ", args.checkpoint)
 
-    # run 5 accent tasks
-    # accents = ["aus", "eng", "ind", "ire", "sco"]
-    # for accent in (accents):
-    #     run_single_task(system, args.output_dir, tname=f"cv-{accent}")
-    run_single_task(system, args.output_dir, tname="cv-all")
+    for tname in args.task_names:
+        run_single_task(system, args.output_dir, tname=tname)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="ASR")
     parser.add_argument('-o', '--output_dir', type=str, help="path for evaluated results")
     parser.add_argument('-s', '--system_name', type=str, help="system identifier")
+    parser.add_argument('-t', '--task_names', nargs='+', help="list of task names to be evaluate")
     parser.add_argument('-c', '--checkpoint', type=str, default=None)
     parser.add_argument('--config', nargs='+', default=["config/system/base.yaml"])
     parser.add_argument("--loader", type=str, default="torch", help="torch or lightning")
