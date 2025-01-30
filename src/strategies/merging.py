@@ -14,21 +14,30 @@ from .common.greedysoup import GreedySoupExecutor
 from .common.swarm import SwarmExecutor
 from .common import merging
 from .common.particle import ModelParticle, linear_combination, system2particle, particle2system
-from .common.utils import load_exp0_results, load_cl_results
+from .common.utils import load_exp0_results, load_cl_results, load_exp0_results_long
 
 
 class UniformSoup(IStrategy):
     def __init__(self, config) -> None:
         self.config = config
 
-        self.info = load_exp0_results()
+        # self.info = load_exp0_results()
+        self.info, self.particle_getter = load_exp0_results_long()
 
+    def _get_initial_system(self):
+        return load_system(
+            system_name=self.config["strategy_config"]["system_name"],
+            system_config=copy.deepcopy(self.config["system_config"])
+        )
+    
     def run(self, data_obj):
         task_name, data_obj = data_obj
         assert data_obj is None
-        n = len(self.info["particles"])
-        merged_particle = linear_combination([1.0 / n] * n, self.info["particles"])
-        merged_system = particle2system(merged_particle, ref_system=self.info["ref_system"])
+        n = len(self.info["raw_paths"])
+        # n = len(self.info["particles"])
+        particles = [self.particle_getter(i) for i in range(n)]
+        merged_particle = linear_combination([1.0 / n] * n, particles)
+        merged_system = particle2system(merged_particle, ref_system=self._get_initial_system())
         merged_system.save(f"{self.config['output_dir']['ckpt_dir']}/merged.ckpt")
 
 
@@ -68,8 +77,9 @@ class GreedySoup(IStrategy):
         self.config = config
 
         # self.info = load_exp0_results()
-        self.info = load_cl_results("results/exp1/seq-ft")
-        self.info["particles"].append(system2particle(self._get_initial_system()))
+        # self.info = load_cl_results("results/exp1/seq-ft")
+        # self.info["particles"].append(system2particle(self._get_initial_system()))
+        self.info, self.particle_getter = load_exp0_results_long()
 
     def _get_initial_system(self):
         return load_system(
@@ -92,7 +102,7 @@ class GreedySoup(IStrategy):
     
     def run(self, data_obj):
         task_name, data_obj = data_obj
-        assert task_name in ["cv-seq", "cv-seq-500"]
+        assert task_name in ["cv-seq", "cv-seq-500", "long1"]
         data_obj = data_obj.get_buffer(-1)
 
         soup_config = {"cache_dir": self.config['output_dir']['log_dir']}
@@ -102,7 +112,8 @@ class GreedySoup(IStrategy):
             linear_operator=linear_combination,
             utility_function=partial(self.eval_particle, ds=data_obj)  # currently depend on cls(data_obj)
         )
-        merged_particle = executor.run(self.info["particles"])
+        particles = [self.particle_getter(i) for i in range(len(self.info["raw_paths"]))]
+        merged_particle = executor.run(particles)
         merged_system = particle2system(merged_particle, ref_system=self._get_initial_system())
         merged_system.save(f"{self.config['output_dir']['ckpt_dir']}/merged.ckpt")
 

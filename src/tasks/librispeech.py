@@ -52,28 +52,42 @@ class NoiseWrapper(Dataset):
 
 class LibriSpeechNoiseTask(Task):
     def __init__(self, noise_type: str, snr_level=10, n_samples=5000) -> None:
-        self.full = LibriSpeechTask()
-        seed = get_seed_from_string_and_int(noise_type, snr_level)
-        random.seed(seed)
-        indices = random.sample(range(len(self.full._train_dataset)), n_samples)
-        self._train_dataset = NoiseWrapper(
-            Subset(self.full._train_dataset, indices=indices),
-            noise_type, snr_level, name=f"LS_{noise_type}_{snr_level}"
-        )
-        self._val_dataset = NoiseWrapper(
-            Subset(self.full._val_dataset, indices=list(range(1000))),
-            noise_type, snr_level, name=f"LS_{noise_type}_{snr_level}"
-        )
-        self._test_dataset = NoiseWrapper(
-            Subset(self.full._test_dataset, indices=list(range(1000))),
-            noise_type, snr_level, name=f"LS_{noise_type}_{snr_level}"
-        )
+        self.name = f"LS_{noise_type}_{snr_level}"
+        self.noise_type = noise_type
+        self.snr_level = snr_level
+        self.n_samples = n_samples
+        self.seed = get_seed_from_string_and_int(noise_type, snr_level)
 
     def train_dataset(self) -> Dataset:
+        res = getattr(self, "_train_dataset", None)
+        if res is None:
+            ds = StandardDataset(root=f"_cache/LibriSpeech/train-clean-360")
+            indices = random.sample(range(len(ds)), self.n_samples)
+            self._train_dataset = NoiseWrapper(
+                Subset(ds, indices=indices),
+                noise_type=self.noise_type,
+                snr_level=self.snr_level
+            )
         return self._train_dataset
 
     def val_dataset(self) -> Dataset:
+        res = getattr(self, "_val_dataset", None)
+        if res is None:
+            ds = StandardDataset(root=f"_cache/LibriSpeech/dev-clean")
+            self._val_dataset = NoiseWrapper(
+                Subset(ds, indices=list(range(1000))),
+                noise_type=self.noise_type,
+                snr_level=self.snr_level
+            )
         return self._val_dataset
     
     def test_dataset(self) -> Dataset:
+        res = getattr(self, "_test_dataset", None)
+        if res is None:
+            ds = StandardDataset(root=f"_cache/LibriSpeech/test-clean")
+            self._test_dataset = NoiseWrapper(
+                Subset(ds, indices=list(range(1000))),
+                noise_type=self.noise_type,
+                snr_level=self.snr_level
+            )
         return self._test_dataset

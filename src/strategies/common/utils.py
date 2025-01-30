@@ -10,14 +10,17 @@ from .particle import ModelParticle, system2particle
 def load_exp0_results():
     res = {}
     particles = []
+    ckpt_paths = []
     for accent in ["eng", "aus", "ind", "sco", "ire"]:
         ckpt_path = f"results/exp0/{accent}/ckpt/best.ckpt"
         config = yaml.load(open(f"results/exp0/{accent}/config.yaml", "r"), Loader=yaml.FullLoader)
         system_cls = get_system_cls(config["system_name"])
         system = system_cls.load_from_checkpoint(ckpt_path)
         particles.append(system2particle(system))
+        ckpt_paths.append(ckpt_path)
         # print(len(particles[-1].get_data().keys()))
     res["particles"] = particles
+    res["raw_paths"] = ckpt_paths
 
     # load pretrained system used in exp0
     res["ref_system"] = load_system(
@@ -25,6 +28,28 @@ def load_exp0_results():
         system_config=yaml.load(open("config/system/base.yaml", "r"), Loader=yaml.FullLoader)
     )
     return res
+
+
+def load_exp0_results_long():
+    res = {}
+    ckpt_paths = []
+    tnames = ["LS_AA_5", "LS_AC_5", "LS_BA_5", "LS_CM_5", "LS_MU_5",
+              "LS_NB_5", "LS_SD_5", "LS_TP_5", "LS_VC_5"]
+    for tname in tnames:
+        ckpt_path = f"results/exp0/{tname}/ckpt/best.ckpt"
+        ckpt_paths.append(ckpt_path)
+    res["raw_paths"] = ckpt_paths
+    
+    # define getter
+    def particle_getter(tid: int):
+        system = load_system(
+            system_name="wav2vec2",
+            checkpoint=res["raw_paths"][tid],
+            loader="lightning"
+        )
+        return system2particle(system)
+
+    return res, particle_getter
 
 
 def load_cl_results(exp_dir: str) -> list[ModelParticle]:

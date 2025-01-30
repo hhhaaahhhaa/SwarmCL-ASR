@@ -48,7 +48,7 @@ def add_noise(clean_wav, noise_type, snr_level):
 
     if noise_type == "GS":
         np.random.seed(666)  # fixed so that the GS noise is always the same
-        noise = np.random.randn(*clean_wav.shape)
+        noise = np.random.randn(*clean_wav.shape).astype(np.float32)
     else:
         noise, _ = librosa.load(f"preprocess/res/{noise_filename}.wav", sr=16000)
 

@@ -14,12 +14,10 @@ from src.tasks.load import get_task
 def get_data_obj(task_name: str):
     if task_name == "none":
         return (task_name, None)
-    elif task_name == "cv-val100":
-        return (task_name, get_task("cv-val100")._dataset)
-    elif task_name in ["cv-seq", "cv-seq-500"]:
-        return (task_name, get_task(task_name))
     else:
-        raise NotImplementedError
+        return (task_name, get_task(task_name))
+    # else:
+    #     raise NotImplementedError
 
 
 def create_config(args):

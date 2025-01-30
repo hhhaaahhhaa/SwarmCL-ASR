@@ -11,15 +11,13 @@ CV_ACCENT = {
     "cv-ire": (f"{SRC_DIR}/commonvoice.py", "IRETask"),
     "cv-sco": (f"{SRC_DIR}/commonvoice.py", "SCOTask"),
     "cv-us": (f"{SRC_DIR}/commonvoice.py", "USTask"),
-    "cv-all": (f"{SRC_DIR}/commonvoice.py", "AllTask"),
 
-    # "cv-val100": (f"{SRC_DIR}/commonvoice.py", "Val100Task"),
-    "cv-seq": (f"{SRC_DIR}/commonvoice.py", "CVSequence100"),
-    "cv-seq-500": (f"{SRC_DIR}/commonvoice.py", "CVSequence500"),
+    "cv-seq": (f"{SRC_DIR}/commonvoice.py", "CVSequence"),
 }
 
 EXP = {
-    
+    "long1": (f"{SRC_DIR}/long.py", "Long1Sequence"),
+    "long2": (f"{SRC_DIR}/long.py", "Long2Sequence"),
 }
 
 TASK_MAPPING = {

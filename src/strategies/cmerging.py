@@ -1,19 +1,20 @@
 import numpy as np
 import torch
+from torch.utils.data import ConcatDataset, Subset
 from tqdm import tqdm
 import copy
 import yaml
 import json
 from functools import partial
 import random
+import logging
 
 from one import load_system
-from src.systems.load import get_system_cls
 from src.strategies.base import IStrategy
 from src.utils.tool import wer
 from .common.greedysoup import GreedySoupExecutor
 from .common.particle import ModelParticle, linear_combination, system2particle, particle2system
-from .common.utils import load_exp0_results, load_cl_results
+from .common.utils import load_exp0_results, load_cl_results, load_exp0_results_long
 from .common.sa import SimulatedAnnealing, BruteForce
 
 
@@ -27,14 +28,11 @@ class Ingredient(object):
 
 class MultiModelStrategy(IStrategy):
 
-    soup: list[Ingredient]
-
     def __init__(self, config) -> None:
         self.config = config
-        self.soup = []
-        self._prev_search_result = None
 
-        self.info = load_exp0_results()
+        # self.info = load_exp0_results()
+        self.info, _ = load_exp0_results_long()
     
     def _get_initial_system(self):
         return load_system(
@@ -44,26 +42,11 @@ class MultiModelStrategy(IStrategy):
 
     def run(self, data_obj):
         _, data_obj = data_obj
+        tid2gid = {"use_raw_path": True}
         for tid, task_name in enumerate(data_obj.task_names):
-            self.soup.append(
-                Ingredient(
-                    particle=self.info["particles"][tid],
-                    tids=[tid],
-                    utility=-1,
-                    n_words=-1
-                )
-            )
-        self._save_to_group(data_obj.task_names)
-
-    def _save_to_group(self, tnames: list[str]):
-        ref_system = self._get_initial_system()
+            tid2gid[task_name] = self.info["raw_paths"][tid]
+        
         dir = self.config['output_dir']['ckpt_dir']
-        tid2gid = {}
-        for gid, ingred in enumerate(self.soup):
-            for tid in ingred.tids:
-                tid2gid[tnames[tid]] = str(gid)
-            system = particle2system(ingred.particle, ref_system=ref_system)
-            system.save(f"{dir}/{str(gid)}.ckpt")
         with open (f"{dir}/info.json", "w") as f:
             json.dump(tid2gid, f, indent=4)
 
@@ -76,10 +59,16 @@ class GeneralCGreedySoup(IStrategy):
         self.config = config
         self.soup = []
         self._prev_search_result = None
+        self._buffer = []
+        logging.basicConfig(filename=f"{self.config['output_dir']['log_dir']}/log.log", level=logging.INFO)
 
-        self.info = load_exp0_results()
+        # self.info = load_exp0_results()
+        self.info, self.particle_getter = load_exp0_results_long()
         # self.info = load_cl_results("results/exp1/seq-ft")
         # self.info["particles"].append(system2particle(self._get_initial_system()))
+
+    def _get_buffer(self, tids: list[int]):
+        return ConcatDataset([self._buffer[x] for x in tids])
 
     def _get_initial_system(self):
         return load_system(
@@ -135,7 +124,7 @@ class GeneralCGreedySoup(IStrategy):
 
         return list(current_subset)
 
-    def _objective_function(self, merged_soup_ids: list[int], data_obj) -> float:
+    def _objective_function(self, merged_soup_ids: list[int]) -> float:
         particles, merged_tids = [], []
         original_utility, denom = 0, 0
         for x in merged_soup_ids:
@@ -151,7 +140,7 @@ class GeneralCGreedySoup(IStrategy):
             soup_config,
             cls_type=ModelParticle,
             linear_operator=linear_combination,
-            utility_function=partial(self._eval_particle, ds=data_obj.get_buffer(merged_tids)),
+            utility_function=partial(self._eval_particle, ds=self._get_buffer(merged_tids)),
             verbose=False
         )
         _, record = executor.run(particles, return_record=True)
@@ -159,7 +148,7 @@ class GeneralCGreedySoup(IStrategy):
         return (merged_utility - original_utility) * denom  # objective is the difference of editdistance before/after merging
 
     # merging
-    def _search_subset_merge(self, data_obj):
+    def _search_subset_merge(self):
         n = len(self.soup)
 
         # Brute force
@@ -179,13 +168,13 @@ class GeneralCGreedySoup(IStrategy):
         all_solutions = subsets_greater_than_one(n)
         optimizer = BruteForce(
             all_solutions=all_solutions,
-            objective_function=partial(self._objective_function, data_obj=data_obj),
+            objective_function=self._objective_function,
         )
 
         # Simulated annealing
         # optimizer = SimulatedAnnealing(
         #     initial_solution=random.sample(list(range(n)), 2),
-        #     objective_function=partial(self._objective_function, data_obj=data_obj),
+        #     objective_function=self._objective_function,
         #     neighbor_function=self._neighbor_function,
         #     initial_temperature=1,
         #     cooling_rate=0.99,
@@ -194,11 +183,14 @@ class GeneralCGreedySoup(IStrategy):
         # )
 
         best_solution, gain = optimizer.optimize()
+        logging.info(f"Best solution: {best_solution}")
+        logging.info(f"Gain: {gain}")
         return best_solution, gain
 
-    def _perform_merge(self, data_obj):  # run merging on the best solution
+    def _perform_merge(self):  # run merging on the best solution
         print("========== Merging ==========")
         best_solution, gain = self._prev_search_result
+        logging.info(f"Merge groups {best_solution}...")
 
         new_soup = []
         particles, merged_tids, original_utility, denom = [], [], 0, 0
@@ -218,11 +210,11 @@ class GeneralCGreedySoup(IStrategy):
             soup_config,
             cls_type=ModelParticle,
             linear_operator=linear_combination,
-            utility_function=partial(self._eval_particle, ds=data_obj.get_buffer(merged_tids))
+            utility_function=partial(self._eval_particle, ds=self._get_buffer(merged_tids))
         )
         merged_particle, record = executor.run(particles, return_record=True)
         merged_utility = record["utility"][-1]
-        print("Matching: ", original_utility * denom + gain, merged_utility * denom)  # should be equal
+        # print("Matching: ", original_utility * denom + gain, merged_utility * denom)  # should be equal
 
         # update soup
         new_soup.append(
@@ -239,13 +231,14 @@ class GeneralCGreedySoup(IStrategy):
     # run
     def _load_start(self, tid, data_obj):
         if len(self.soup) == self.config["strategy_config"]["max_size"]:  # max size achieved, force merge
+            logging.info("Max size achieved")
             if self._prev_search_result is None:
-                self._prev_search_result = self._search_subset_merge(data_obj)
-            self._perform_merge(data_obj)
+                self._prev_search_result = self._search_subset_merge()
+            self._perform_merge()
 
     def _integrate(self, tid, data_obj):
         # eval and create ingredient
-        new_particle = self.info["particles"][tid]
+        new_particle = self.particle_getter(tid)
         if getattr(self, "ref_system_for_eval", None) is None:
             self.ref_system_for_eval = self._get_initial_system()
         system = particle2system(new_particle, ref_system=self.ref_system_for_eval)
@@ -253,41 +246,48 @@ class GeneralCGreedySoup(IStrategy):
         system.cuda()
         gt, predictions = [], []
         n_words = 0
-        ds = data_obj.get_buffer([tid])
+        ds = data_obj.tasks[tid].val_dataset()
+        ds = Subset(ds, indices=list(range(self.config["strategy_config"]["n_val"])))
         for sample in ds:
             predictions.extend(system.inference([sample["wav"]]))
             gt.append(sample["text"])
             n_words += len(sample["text"].split(" "))
         word_error_rate = wer(gt, predictions)
         self.soup.append(Ingredient(new_particle, [tid], -word_error_rate, n_words))
+        self._buffer.append(ds)
 
         if len(self.soup) == 1:
             return
-        best_solution, gain = self._search_subset_merge(data_obj)
+        best_solution, gain = self._search_subset_merge()
         self._prev_search_result = (best_solution, gain)
         if gain > 0:  # improve if merged
-            self._perform_merge(data_obj)
+            logging.info("Improved")
+            self._perform_merge()
 
     def run(self, data_obj):
         task_name, data_obj = data_obj
-        assert task_name in ["cv-seq", "cv-seq-500"]
+        # assert isinstance(data_obj, TaskSequence)
+        assert task_name in ["cv-seq", "cv-seq-500", "long1"]
         for tid, task_name in enumerate(data_obj.task_names):
+            logging.info(f"Task {tid}: {task_name}")
             self._load_start(tid, data_obj)
             self._integrate(tid, data_obj)
-            # for ingred in self.soup:
-            #     print(ingred.tids)
-            #     print(ingred.utility)
-            #     print(ingred.n_words)
+
+            logging.info("Groups:")
+            for j, ingred in enumerate(self.soup):
+                logging.info(f"{j}: {ingred.tids}")
+            logging.info("")
 
         self._save_to_group(data_obj.task_names)
 
         # final merge
+        n = len(data_obj.task_names)
         soup_config = {"cache_dir": self.config['output_dir']['log_dir']}
         executor = GreedySoupExecutor(
             soup_config,
             cls_type=ModelParticle,
             linear_operator=linear_combination,
-            utility_function=partial(self._eval_particle, ds=data_obj.get_buffer(-1)),
+            utility_function=partial(self._eval_particle, ds=self._get_buffer(list(range(n)))),
             verbose=False
         )
         particles = [ingred.particle for ingred in self.soup]
@@ -308,7 +308,7 @@ class GeneralCGreedySoup(IStrategy):
 
 
 class GeneralCUniformSoup(GeneralCGreedySoup):
-    def _objective_function(self, merged_soup_ids: list[int], data_obj) -> float:
+    def _objective_function(self, merged_soup_ids: list[int]) -> float:
         particles, merged_tids = [], []
         original_utility, denom = 0, 0
         for x in merged_soup_ids:
@@ -320,10 +320,10 @@ class GeneralCUniformSoup(GeneralCGreedySoup):
 
         # run merging
         merged_particle = linear_combination([1 / len(particles)] * len(particles), particles)
-        merged_utility = self._eval_particle(merged_particle, ds=data_obj.get_buffer(merged_tids))
+        merged_utility = self._eval_particle(merged_particle, ds=self._get_buffer(merged_tids))
         return (merged_utility - original_utility) * denom  # objective is the difference of editdistance before/after merging
     
-    def _perform_merge(self, data_obj):  # run merging on the best solution
+    def _perform_merge(self):  # run merging on the best solution
         print("========== Merging ==========")
         best_solution, gain = self._prev_search_result
 
@@ -341,7 +341,7 @@ class GeneralCUniformSoup(GeneralCGreedySoup):
 
         # run merging again since we do not save anything during the optimization
         merged_particle = linear_combination([1 / len(particles)] * len(particles), particles)
-        merged_utility = self._eval_particle(merged_particle, ds=data_obj.get_buffer(merged_tids))
+        merged_utility = self._eval_particle(merged_particle, ds=self._get_buffer(merged_tids))
         print("Matching: ", original_utility * denom + gain, merged_utility * denom)  # should be equal
 
         # update soup

@@ -1,7 +1,7 @@
-from torch.utils.data import Dataset, ConcatDataset, Subset
+from torch.utils.data import Dataset, ConcatDataset
 
 from .base import Task, StandardDataset
-from .utils import MultiTaskSequence
+from .utils import TaskSequence
 
 
 class CVAccentTask(Task):
@@ -50,84 +50,7 @@ class USTask(Task):
         return CVAccentTask(accent="us")
 
 
-class AllTask(Task):
-    def __init__(self) -> None:
-        accents = ["eng", "aus", "ind", "sco", "ire"]
-        self._train_dataset = MultiTaskSequence([
-            StandardDataset(root=f"_cache/CommonVoice-accent-full/{accent}/train", name=f"cv-{accent}")
-        for accent in accents])
-        self._val_dataset = MultiTaskSequence([
-            StandardDataset(root=f"_cache/CommonVoice-accent-full/{accent}/dev", name=f"cv-{accent}")
-        for accent in accents])
-        self._test_dataset = MultiTaskSequence([
-            StandardDataset(root=f"_cache/CommonVoice-accent-full/{accent}/test", name=f"cv-{accent}")
-        for accent in accents])
-    def train_dataset(self) -> Dataset:
-        return self._train_dataset
-
-    def val_dataset(self) -> Dataset:
-        return self._val_dataset
-    
-    def test_dataset(self) -> Dataset:
-        return self._test_dataset
-
-
-class Val100Task(Task):
-    """ This is only an object. """
-    def __init__(self) -> None:
-        accents = ["aus", "eng", "ind", "ire", "sco"]
-        indices = list(range(20))
-        self._datasets = [
-            Subset(StandardDataset(root=f"_cache/CommonVoice-accent-full/{accent}/dev"), indices=indices)
-        for accent in accents]
-        self._dataset = ConcatDataset(self._datasets)
-
-    def train_dataset(self) -> Dataset:
-        raise NotImplementedError
-
-    def val_dataset(self) -> Dataset:
-        raise NotImplementedError
-    
-    def test_dataset(self) -> Dataset:
-        raise NotImplementedError
-
-
-class CVSequence(Task):
-    """ This is only an object. """
-    def __init__(self, n_samples_per_task=20) -> None:
-        accents = ["eng", "aus", "ind", "sco", "ire"]
-        indices = list(range(n_samples_per_task))
-        self._datasets = [
-            Subset(StandardDataset(root=f"_cache/CommonVoice-accent-full/{accent}/dev"), indices=indices)
-        for accent in accents]
-
-        self.task_names = [f"cv-{x}" for x in accents]
-
-    def get_buffer(self, tid: int):
-        if isinstance(tid, list):
-            return ConcatDataset([self._datasets[x] for x in tid])
-        if tid == -1:
-            return ConcatDataset(self._datasets)
-        elif tid == 0:
-            return self._datasets[0]
-        else:
-            return ConcatDataset(self._datasets[:tid+1])
-
-    def train_dataset(self) -> Dataset:
-        raise NotImplementedError
-
-    def val_dataset(self) -> Dataset:
-        raise NotImplementedError
-    
-    def test_dataset(self) -> Dataset:
-        raise NotImplementedError
-
-
-class CVSequence100(Task):
-    def __new__(cls):
-        return CVSequence(n_samples_per_task=20)
-
-
-class CVSequence500(Task):
-    def __new__(cls):
-        return CVSequence(n_samples_per_task=100)
+class CVSequence(TaskSequence):
+    def __init__(self):
+        tnames = ["cv-eng", "cv-aus", "cv-ind", "cv-sco", "cv-ire"]
+        super().__init__(tnames)
