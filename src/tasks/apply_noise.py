@@ -61,3 +61,19 @@ def add_noise(clean_wav, noise_type, snr_level):
         noise = noise[0:len(clean_wav)]
 
     return snr_mixer(clean_wav, noise, snr=snr_level)
+
+
+class NoiseWrapper(Dataset):
+    def __init__(self, ds: Dataset, noise_type: str, snr_level=10, name: str=None):
+        self.obj = ds
+        self.noise_type = noise_type
+        self.snr_level = snr_level
+        self.name = name
+    
+    def __getitem__(self, index):
+        res = self.obj.__getitem__(index)
+        res["wav"] = add_noise(res["wav"], noise_type=self.noise_type, snr_level=self.snr_level)
+        return res
+    
+    def __len__(self):
+        return len(self.obj)

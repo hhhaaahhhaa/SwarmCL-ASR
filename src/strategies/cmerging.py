@@ -11,6 +11,7 @@ import logging
 
 from one import load_system
 from src.strategies.base import IStrategy
+from src.tasks.utils import TaskSequence
 from src.utils.tool import wer
 from .common.greedysoup import GreedySoupExecutor
 from .common.particle import ModelParticle, linear_combination, system2particle, particle2system
@@ -266,8 +267,7 @@ class GeneralCGreedySoup(IStrategy):
 
     def run(self, data_obj):
         task_name, data_obj = data_obj
-        # assert isinstance(data_obj, TaskSequence)
-        assert task_name in ["cv-seq", "cv-seq-500", "long1"]
+        assert isinstance(data_obj, TaskSequence)
         for tid, task_name in enumerate(data_obj.task_names):
             logging.info(f"Task {tid}: {task_name}")
             self._load_start(tid, data_obj)
@@ -326,6 +326,7 @@ class GeneralCUniformSoup(GeneralCGreedySoup):
     def _perform_merge(self):  # run merging on the best solution
         print("========== Merging ==========")
         best_solution, gain = self._prev_search_result
+        logging.info(f"Merge groups {best_solution}...")
 
         new_soup = []
         particles, merged_tids, original_utility, denom = [], [], 0, 0
@@ -342,7 +343,7 @@ class GeneralCUniformSoup(GeneralCGreedySoup):
         # run merging again since we do not save anything during the optimization
         merged_particle = linear_combination([1 / len(particles)] * len(particles), particles)
         merged_utility = self._eval_particle(merged_particle, ds=self._get_buffer(merged_tids))
-        print("Matching: ", original_utility * denom + gain, merged_utility * denom)  # should be equal
+        # print("Matching: ", original_utility * denom + gain, merged_utility * denom)  # should be equal
 
         # update soup
         new_soup.append(

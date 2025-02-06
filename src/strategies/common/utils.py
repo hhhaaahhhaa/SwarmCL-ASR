@@ -33,8 +33,13 @@ def load_exp0_results():
 def load_exp0_results_long():
     res = {}
     ckpt_paths = []
-    tnames = ["LS_AA_5", "LS_AC_5", "LS_BA_5", "LS_CM_5", "LS_MU_5",
-              "LS_NB_5", "LS_SD_5", "LS_TP_5", "LS_VC_5"]
+    tnames = [# "eng", "aus", "ind", "ire", "sco",
+        "LS_AA_5", "eng", "LS_AC_5", "aus", "LS_BA_5", "LS_CM_5", "LS_MU_5",
+              "ind", "LS_NB_5", "LS_SD_5", "LS_TP_5", "ire", "sco", "LS_VC_5"]
+    tnames = [
+        "LS_TP_5", "LS_VC_5", "ire", "LS_SD_5", "aus", "LS_MU_5", "LS_BA_5",
+        "ind", "LS_AA_5", "LS_NB_5", "LS_CM_5", "eng", "LS_AC_5", "sco"
+    ]
     for tname in tnames:
         ckpt_path = f"results/exp0/{tname}/ckpt/best.ckpt"
         ckpt_paths.append(ckpt_path)
