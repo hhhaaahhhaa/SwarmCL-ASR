@@ -20,6 +20,9 @@ EXP = {
     "long2": (f"{SRC_DIR}/long.py", "Long2Sequence"),
     "long2a": (f"{SRC_DIR}/long.py", "Long2ASequence"),
     "long2b": (f"{SRC_DIR}/long.py", "Long2BSequence"),
+}
+
+LONG = {
     "long3a": (f"{SRC_DIR}/long.py", "Long3ASequence"),
     "long3b": (f"{SRC_DIR}/long.py", "Long3BSequence"),
     "long3c": (f"{SRC_DIR}/long.py", "Long3CSequence"),
@@ -27,6 +30,7 @@ EXP = {
 
 TASK_MAPPING = {
     **CV_ACCENT,
+    **LONG,
     **EXP,
 }
 

@@ -31,9 +31,6 @@ class MultiModelStrategy(IStrategy):
 
     def __init__(self, config) -> None:
         self.config = config
-
-        # self.info = load_exp0_results()
-        self.info, _ = load_exp0_results_long()
     
     def _get_initial_system(self):
         return load_system(
@@ -43,6 +40,8 @@ class MultiModelStrategy(IStrategy):
 
     def run(self, data_obj):
         _, data_obj = data_obj
+        self.info, _ = load_exp0_results_long(tnames=data_obj.task_names)
+
         tid2gid = {"use_raw_path": True}
         for tid, task_name in enumerate(data_obj.task_names):
             tid2gid[task_name] = self.info["raw_paths"][tid]
@@ -64,7 +63,6 @@ class GeneralCGreedySoup(IStrategy):
         logging.basicConfig(filename=f"{self.config['output_dir']['log_dir']}/log.log", level=logging.INFO)
 
         # self.info = load_exp0_results()
-        self.info, self.particle_getter = load_exp0_results_long()
         # self.info = load_cl_results("results/exp1/seq-ft")
         # self.info["particles"].append(system2particle(self._get_initial_system()))
 
@@ -268,6 +266,7 @@ class GeneralCGreedySoup(IStrategy):
     def run(self, data_obj):
         task_name, data_obj = data_obj
         assert isinstance(data_obj, TaskSequence)
+        self.info, self.particle_getter = load_exp0_results_long(tnames=data_obj.task_names)
         for tid, task_name in enumerate(data_obj.task_names):
             logging.info(f"Task {tid}: {task_name}")
             self._load_start(tid, data_obj)
