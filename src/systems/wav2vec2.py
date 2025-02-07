@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from transformers import Wav2Vec2ForCTC, Wav2Vec2Processor, Wav2Vec2ProcessorWithLM
 import json
+import random
 from lightning.pytorch.callbacks import ModelCheckpoint, Callback, LearningRateMonitor
 from lightning.pytorch.loggers.logger import merge_dicts
 
@@ -283,3 +284,34 @@ class Saver(Callback):
             avg_loss_dict = merge_dicts(self.train_loss_dicts)
             pl_module.log_dict(avg_loss_dict, sync_dist=True, batch_size=pl_module.bs, prog_bar=True)
             self.train_loss_dicts = []
+
+
+class Wav2vec2ERSystem(Wav2vec2System):
+    def __init__(self, config) -> None:
+        super().__init__(config)
+        self._buffer = []
+
+    def _common_step(self, batch, batch_idx, train=True) -> tuple[dict, dict]:
+        wavs, texts = batch["wav"], batch["text"]
+
+        # extend with past samples
+        if self._buffer and train:
+            past_samples = random.sample(self._buffer, len(wavs))
+            for sample in past_samples:
+                wavs.append(sample["wav"])
+                texts.append(sample["text"])
+
+        inputs = self._wav_to_model_input(wavs)
+        labels = self._text_to_model_input(texts)
+        inputs["labels"] = labels
+        outputs = self.model(**inputs)
+        loss = outputs.loss
+
+        loss_dict = {
+            "Total Loss": loss,
+        }
+        info = {
+            "outputs": outputs
+        }
+            
+        return loss_dict, info

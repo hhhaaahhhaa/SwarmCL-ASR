@@ -19,6 +19,7 @@ MERGING = {
 
 CONTINUAL = {
     "seq-ft": (f"{SRC_DIR}/seq_ft.py", "SeqFTStrategy"),
+    "er": (f"{SRC_DIR}/seq_ft.py", "ERStrategy"),
     "seq-greedysoup": (f"{SRC_DIR}/seq_greedysoup.py", "SeqGreedySoupStrategy"),
     "seq-linear": (f"{SRC_DIR}/seq_linear.py", "SeqLinearStrategy"),
     # "seq-ties": (f"{SRC_DIR}/seq_linear.py", "SeqLinearStrategy"),

@@ -8,6 +8,7 @@ SRC_DIR = "src/systems"
 
 BASIC = {
     "wav2vec2": (f"{SRC_DIR}/wav2vec2.py", "Wav2vec2System"),
+    "wav2vec2-er": (f"{SRC_DIR}/wav2vec2.py", "Wav2vec2ERSystem"),
 }
 
 GROUP = {

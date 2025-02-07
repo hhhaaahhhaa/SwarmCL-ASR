@@ -58,7 +58,7 @@ def load_system(system_name: str, system_config=None, checkpoint=None, loader="t
         raise NotImplementedError
 
 
-def train_one_task(config: dict, loader="torch", debug: bool=False):
+def train_one_task(config: dict, loader="torch", debug: bool=False, system_hook=None):
     # Init system
     system_config = config["config"]
     system = load_system(
@@ -120,6 +120,10 @@ def train_one_task(config: dict, loader="torch", debug: bool=False):
         logger=loggers,
         profiler=SimpleProfiler(system_config["output_dir"]["exp_root"], filename="profile"),
     )
+
+    if system_hook is not None:
+        system_hook(system)
+    
     trainer.fit(system, datamodule=datamodule)
 
 
